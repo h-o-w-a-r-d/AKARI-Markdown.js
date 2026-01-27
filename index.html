@@ -1,1 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Component Markdown</title>
+    
+    <!-- 全域樣式：測試樣式隔離 -->
+    <style>
+        body { background: #eee; font-family: sans-serif; padding: 20px; }
+        /* 這裡定義的 h1 不會影響 Akari 內部的 h1 */
+        h1 { color: red; text-align: center; } 
+        /* 這裡定義的 p 不會影響內部 */
+        p { color: blue; }
+        
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
 
+    <h1>外部 H1 (紅色) - 不應影響內部</h1>
+    <p>外部 P (藍色) - 不應影響內部</p>
+
+    <div class="chat-container">
+        <!-- 使用自定義標籤 -->
+        <akari-markdown id="ai-output"></akari-markdown>
+    </div>
+
+    <script type="module">
+        import 'https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.0.0/akari-markdown.min.js';
+
+        const output = document.getElementById('ai-output');
+
+        // (選用) 設定 Hook
+        output.setup({
+            hooks: {
+                onRendered: (container) => {
+                    console.log('Shadow DOM 更新完畢，高度:', container.scrollHeight);
+                }
+            }
+        });
+
+        // 模擬串流
+        const text = `
+# 內部 H1 (應為預設黑/灰色)
+這是一段測試文字，應該是標準顏色而非藍色。
+
+## 數學測試
+$$ E = mc^2 $$
+
+## 程式碼測試 (Shadow DOM 樣式注入)
+\`\`\`javascript
+const webComponent = true;
+console.log('Style Isolated!');
+\`\`\`
+
+## Mermaid 圖表
+\`\`\`mermaid
+graph LR
+    A[Shadow Host] -->|包含| B(Shadow Root)
+    B -->|包含| C[Style CSS]
+    B -->|包含| D[Markdown Content]
+\`\`\`
+`;
+
+        let i = 0;
+        function stream() {
+            if (i < text.length) {
+                // 每次加一點字
+                const chunk = text.slice(0, i += 5);
+                output.render(chunk);
+                requestAnimationFrame(stream);
+            } else {
+                output.render(text, true); // 結束
+            }
+        }
+        
+        // 開始模擬
+        stream();
+
+    </script>
+</body>
+</html>
