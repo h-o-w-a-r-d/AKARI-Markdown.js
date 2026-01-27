@@ -1,7 +1,7 @@
 /* --- START OF FILE akari-markdown.js --- */
 
 /*!
- * AKARI-Markdown.js v1.1.0 (Streaming Optimized)
+ * AKARI-Markdown.js v1.2.0 (Fix Mermaid Rendering)
  * (c) 2026 h-o-w-a-r-d
  * Released under the MIT License.
  * Repository: https://github.com/h-o-w-a-r-d/AKARI-Markdown.js
@@ -58,6 +58,17 @@ export class AkariMarkdownElement extends HTMLElement {
                 border-left: 2px solid #30363d;
                 padding-left: 10px;
             }
+            /* 錯誤顯示樣式 */
+            .mermaid-error-msg {
+                color: #ff6b6b;
+                font-size: 0.8em;
+                padding: 8px;
+                background: rgba(255, 0, 0, 0.1);
+                border-radius: 4px;
+                margin-bottom: 5px;
+                white-space: pre-wrap;
+                font-family: monospace;
+            }
             .mermaid-streaming::after {
                 content: ' ▋';
                 animation: blink 1s infinite;
@@ -71,8 +82,8 @@ export class AkariMarkdownElement extends HTMLElement {
 
         this.options = {
             theme: 'dark',
-            throttleInterval: 30, // 稍微加快 Markdown 解析頻率
-            mermaidDebounce: 300, // Mermaid 檢查頻率
+            throttleInterval: 30, 
+            mermaidDebounce: 300, 
             hooks: {}
         };
 
@@ -83,7 +94,7 @@ export class AkariMarkdownElement extends HTMLElement {
         this._mermaidTimer = null;
         this._latestMarkdown = '';
         this._isRendering = false;
-        this._isMermaidWorking = false; // Mermaid 鎖
+        this._isMermaidWorking = false; 
 
         this._initLibraries();
     }
@@ -121,21 +132,22 @@ export class AkariMarkdownElement extends HTMLElement {
 
         const renderer = {
             code: (code, lang) => {
+                // 如果沒有指定語言，默認為空
+                lang = lang || '';
+
                 if (lang === 'mermaid') {
-                    // ★★★ Mermaid 完整性檢查 ★★★
-                    // 我們檢查這段 code 在原始 markdown 中是否被 ``` 包裹閉合
-                    // 注意：marked 傳進來的 code 已經去掉了前後的 ```
+                    // ★ 關鍵修復：解碼 HTML 實體 (如 &gt; 轉為 >)，否則 Mermaid 解析器會報錯
+                    const cleanCode = this._decodeHtml(code);
                     
-                    const isClosed = this._checkMermaidIntegrity(code);
+                    // 檢查完整性
+                    const isClosed = this._checkMermaidIntegrity(cleanCode);
 
                     if (!isClosed) {
-                        // 如果未閉合，標記為 streaming 狀態，這會被 CSS 樣式化，且被排程器忽略
-                        return `<div class="mermaid-streaming">${this._escapeHtml(code)}</div>`;
+                        return `<div class="mermaid-streaming">${this._escapeHtml(cleanCode)}</div>`;
                     }
 
-                    // 如果已閉合，標記為準備就緒的 mermaid
                     // 添加 data-code hash 用於 diff 對比
-                    return `<div class="mermaid" data-code="${this._hashCode(code)}">${code}</div>`;
+                    return `<div class="mermaid" data-code="${this._hashCode(cleanCode)}">${this._escapeHtml(cleanCode)}</div>`;
                 }
                 
                 if (lang && hljs.getLanguage(lang)) {
@@ -144,7 +156,7 @@ export class AkariMarkdownElement extends HTMLElement {
                         return `<pre><code class="hljs language-${lang}">${highlighted}</code></pre>`;
                     } catch (e) { }
                 }
-                return `<pre><code class="hljs">${code}</code></pre>`;
+                return `<pre><code class="hljs">${this._escapeHtml(code)}</code></pre>`;
             }
         };
 
@@ -155,38 +167,41 @@ export class AkariMarkdownElement extends HTMLElement {
         mermaid.initialize({ 
             startOnLoad: false, 
             theme: this.options.theme,
-            securityLevel: 'loose',
-            suppressErrorRendering: true,
+            securityLevel: 'loose', // 允許寬鬆模式，這對於某些圖表在 Shadow DOM 渲染很重要
+            suppressErrorRendering: true, // 我們自己處理錯誤渲染
         });
 
         mermaid.parseError = function(err, hash) {
-            // 靜默錯誤，交由 _scheduleMermaidRender 處理
+            // 靜默全局錯誤，交由 _scheduleMermaidRender 的 try-catch 處理
         };
     }
 
-    // ★★★ 新增：檢查 Mermaid 代碼塊是否完整閉合 ★★★
+    // 檢查 Markdown 是否完整閉合
     _checkMermaidIntegrity(codeSnippet) {
         if (!this._latestMarkdown) return false;
-        
-        // 簡單且高效的檢查：
-        // 1. 去除 snippet 前後空白，避免因空白差異導致匹配失敗
-        // 2. 在原始 Markdown 中尋找 "snippet + 結尾 fences"
-        // 為了避免正則特殊字符問題，我們使用字符串包含檢查
         
         const trimmedSnippet = codeSnippet.trim();
         if (trimmedSnippet.length === 0) return false;
 
-        // 我們檢查原始 Markdown 中是否包含這段代碼，且後面緊跟著 ```
-        // 這不是完美的 parser 級檢查，但對於串流場景非常有效
-        // 由於 marked 可能會處理換行，我們嘗試匹配最後一部分
-        const lastPart = trimmedSnippet.slice(-20); // 取最後20個字元
-        const index = this._latestMarkdown.lastIndexOf(lastPart);
+        // 取代碼片段的最後一部分來進行定位
+        // 增加長度以確保唯一性，但防止過長
+        const searchPart = trimmedSnippet.slice(-Math.min(trimmedSnippet.length, 50)); 
         
+        const index = this._latestMarkdown.lastIndexOf(searchPart);
         if (index === -1) return false;
 
         // 檢查該位置之後是否有 ```
-        const stringAfter = this._latestMarkdown.slice(index + lastPart.length);
+        const stringAfter = this._latestMarkdown.slice(index + searchPart.length);
+        
+        // 允許代碼塊內容後有換行符，然後才是 ```
         return /^\s*```/.test(stringAfter);
+    }
+
+    // ★ 關鍵修復：HTML 實體解碼 helper
+    _decodeHtml(html) {
+        const txt = document.createElement("textarea");
+        txt.innerHTML = html;
+        return txt.value;
     }
 
     async render(markdownText, force = false) {
@@ -227,7 +242,7 @@ export class AkariMarkdownElement extends HTMLElement {
 
             html = DOMPurify.sanitize(html, {
                 ADD_TAGS: ['iframe'],
-                ADD_ATTR: ['target', 'class', 'data-code'] // 允許 data-code 用於 diff
+                ADD_ATTR: ['target', 'class', 'data-code', 'data-rendered'] 
             });
 
             if (this.options.hooks.afterSanitize) {
@@ -236,7 +251,6 @@ export class AkariMarkdownElement extends HTMLElement {
 
             html = this._restoreAndRenderMath(html);
 
-            // ★★★ 核心修改：使用 Diff 更新 DOM，而不是直接 innerHTML ★★★
             if (forceFullRender) {
                 this.container.innerHTML = html;
             } else {
@@ -254,8 +268,6 @@ export class AkariMarkdownElement extends HTMLElement {
         }
     }
 
-    // ★★★ 新增：輕量級 DOM Diff 與更新算法 ★★★
-    // 這確保了已渲染的 Mermaid 圖表（以及其他元素）不會被銷毀重建
     _updateDOM(container, newHtmlString) {
         const template = document.createElement('div');
         template.innerHTML = newHtmlString;
@@ -269,25 +281,21 @@ export class AkariMarkdownElement extends HTMLElement {
             const newNode = newNodes[i];
             const oldNode = oldNodes[i];
 
-            // 1. 如果舊節點不存在，追加新節點
             if (!oldNode) {
                 container.appendChild(newNode.cloneNode(true));
                 continue;
             }
 
-            // 2. 如果新節點不存在，移除舊節點 (通常是刪減內容時)
             if (!newNode) {
                 oldNode.remove();
                 continue;
             }
 
-            // 3. 節點類型不同，直接替換
             if (newNode.nodeType !== oldNode.nodeType || newNode.tagName !== oldNode.tagName) {
                 container.replaceChild(newNode.cloneNode(true), oldNode);
                 continue;
             }
 
-            // 4. 文本節點處理
             if (newNode.nodeType === Node.TEXT_NODE) {
                 if (newNode.textContent !== oldNode.textContent) {
                     oldNode.textContent = newNode.textContent;
@@ -295,33 +303,23 @@ export class AkariMarkdownElement extends HTMLElement {
                 continue;
             }
 
-            // 5. 元素節點處理 (尤其是 Mermaid)
             if (newNode.nodeType === Node.ELEMENT_NODE) {
-                // 特殊處理 Mermaid：如果 hash 相同，且舊節點已經包含了 SVG，則完全不做任何事
-                // 這保護了已經渲染好的圖表不被替換回原始碼 div
+                // Mermaid 保護邏輯
                 if (newNode.classList.contains('mermaid') && 
                     oldNode.classList.contains('mermaid') &&
-                    oldNode.querySelector('svg')) {
+                    oldNode.dataset.rendered === "true") { // 使用 rendered 標記更準確
                     
                     const newHash = newNode.getAttribute('data-code');
                     const oldHash = oldNode.getAttribute('data-code');
                     
                     if (newHash && newHash === oldHash) {
-                        // 內容一樣，舊的已經是 SVG，保留舊的，跳過更新
                         continue;
                     }
                 }
 
-                // 簡單的屬性對比與內容更新 (如果不是保留的 mermaid)
-                // 為了性能，如果 outerHTML 相似度極高可考慮跳過，但這裡簡單遞歸
                 if (newNode.outerHTML !== oldNode.outerHTML) {
-                    // 如果是普通節點，內容變了，我們選擇替換節點
-                    // (為了更精細可以遞歸 diff children，但對於 Markdown 這種層級通常直接替換即可)
-                    // 但為了避免輸入框丟焦點等問題，如果 class 沒變，可以嘗試只更新 innerHTML
                     if (newNode.className === oldNode.className) {
-                         // 遞歸更新子節點 (除了 mermaid，前面已處理)
-                         // 這裡簡化處理：直接替換，除非我們想做深度 diff
-                         // 對於 Markdown 顯示器，直接替換變更的區塊通常足夠快
+                         // 這裡可以做更深層遞歸，目前為性能直接替換
                          container.replaceChild(newNode.cloneNode(true), oldNode);
                     } else {
                         container.replaceChild(newNode.cloneNode(true), oldNode);
@@ -337,8 +335,9 @@ export class AkariMarkdownElement extends HTMLElement {
         this._mermaidTimer = setTimeout(async () => {
             if (this._isMermaidWorking) return;
             
-            // 只選取 .mermaid 類別，這意味著已經通過了完整性檢查
-            // .mermaid-streaming 類別的節點會被忽略
+            // 選取所有 mermaid 類別且尚未成功渲染的節點
+            // 注意：我們不過濾 data-rendered="true" 的節點，因為如果是新的 DOM 結構，它們可能需要重新處理
+            // 但我們會檢查內部是否已經有 svg
             const nodes = this.container.querySelectorAll('.mermaid');
             
             if (nodes.length === 0) return;
@@ -346,26 +345,34 @@ export class AkariMarkdownElement extends HTMLElement {
             this._isMermaidWorking = true;
 
             for (const node of nodes) {
-                // 再次檢查：如果已經有 SVG，跳過
                 if (node.querySelector('svg')) continue;
 
-                const code = node.textContent; 
-                if (!code) continue;
+                // 再次解碼，確保從 DOM 取回的代碼是乾淨的
+                const code = this._decodeHtml(node.textContent); 
+                if (!code.trim()) continue;
 
                 const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
                 try {
+                    // 嘗試渲染
                     const { svg } = await mermaid.render(id, code);
                     node.innerHTML = svg;
-                    // 渲染成功後，確保 dataset 標記正確
                     node.dataset.rendered = "true";
+                    node.classList.remove('mermaid-error');
                 } catch (err) {
-                    // 渲染失敗（語法錯誤），顯示原始碼
-                    node.innerHTML = `<div class="mermaid-source">${this._escapeHtml(code)}</div>`;
+                    // ★ 關鍵修復：顯示具體的錯誤訊息，而不僅僅是原始碼
+                    console.warn('[AkariMarkdown] Mermaid Error:', err);
+                    
+                    // 保留原始碼方便修改
+                    node.innerHTML = `
+                        <div class="mermaid-error-msg">⚠️ Mermaid Error:\n${this._escapeHtml(err.message)}</div>
+                        <div class="mermaid-source">${this._escapeHtml(code)}</div>
+                    `;
                     node.classList.add('mermaid-error');
                     
+                    // 清理可能產生的殘留 DOM (mermaid 有時會在 body 留垃圾)
                     const stray = document.getElementById('d' + id) || document.getElementById(id);
-                    if (stray && stray !== node) stray.remove();
+                    if (stray) stray.remove();
                 }
             }
             this._isMermaidWorking = false;
@@ -441,7 +448,6 @@ export class AkariMarkdownElement extends HTMLElement {
         return text.replace(/[&<>"']/g, m => map[m]);
     }
     
-    // 簡單的字串 hash 函數，用於比較代碼是否變更
     _hashCode(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
