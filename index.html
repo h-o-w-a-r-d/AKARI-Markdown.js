@@ -669,36 +669,47 @@ xychart-beta
 
     // 2. Event Listeners
     
-    // Load Showcase
-    document.getElementById('btn-showcase').addEventListener('click', () => {
+// Load Showcase
+const btnShowcase = document.getElementById('btn-showcase');
+if(btnShowcase) {
+    btnShowcase.addEventListener('click', () => {
         stopStream();
-        input.value = SHOWCASE_CONTENT;
-        preview.value = SHOWCASE_CONTENT;
+        // 確保 SHOWCASE_CONTENT 變數在外部有定義，否則請填入字串
+        const content = typeof SHOWCASE_CONTENT !== 'undefined' ? SHOWCASE_CONTENT : "# Demo Content"; 
+        input.value = content;
+        preview.value = content;
         statusText.textContent = "Showcase content loaded";
     });
+}
 
-    // Clear
-    document.getElementById('btn-clear').addEventListener('click', () => {
+// Clear
+const btnClear = document.getElementById('btn-clear');
+if(btnClear) {
+    btnClear.addEventListener('click', () => {
         stopStream();
         input.value = '';
         preview.value = '';
         statusText.textContent = "Cleared";
     });
+}
 
-    // Simulate Stream
-    document.getElementById('btn-stream').addEventListener('click', () => {
+// 2. Simulate Stream (加速版)
+const btnStream = document.getElementById('btn-stream');
+if(btnStream) {
+    btnStream.addEventListener('click', () => {
         stopStream();
-        statusText.textContent = "🚀 Streaming...";
-        preview.value = ''; // Clear preview
+        statusText.textContent = "🚀 Super Fast Streaming...";
+        preview.value = ''; 
         input.value = '';
         
-        const content = SHOWCASE_CONTENT;
+        const content = typeof SHOWCASE_CONTENT !== 'undefined' ? SHOWCASE_CONTENT : "# Default Demo Content...";
         let index = 0;
         
-        // Simulate network latency and chunks
+        // 使用更短的間隔
         streamInterval = setInterval(() => {
-            // Random chunk size between 2 and 8 chars
-            const chunkSize = Math.floor(Math.random() * 6) + 2;
+            // ★★★ 加速關鍵：大幅增加 Chunk Size ★★★
+            // 每次隨機輸出 10 到 50 個字元，這比原本的 2-6 快很多
+            const chunkSize = Math.floor(Math.random() * 40) + 10;
             const chunk = content.slice(index, index + chunkSize);
             
             if (!chunk) {
@@ -709,37 +720,39 @@ xychart-beta
             
             const currentText = input.value + chunk;
             input.value = currentText;
-            
-            // ★★★ CORE: Update value, component handles throttling ★★★
             preview.value = currentText;
             
             index += chunkSize;
             
-            // Scroll the input textarea (Left side)
-            input.scrollTop = input.scrollHeight;
-
-        }, 8); // Fast stream (20ms)
+            // 注意：這裡移除了原本的 input.scrollTop = input.scrollHeight;
+            // 現在改由 preview.config.hooks.onRendered 負責觸發
+            
+        }, 10); // 10ms 是瀏覽器穩定運行的較快頻率
     });
+}
 
-    // 3. Manual Input
-    input.addEventListener('input', () => {
-        stopStream(); // Stop stream on manual input
-        statusText.textContent = "Manual editing...";
-        preview.value = input.value;
-    });
+// 3. Manual Input
+input.addEventListener('input', () => {
+    stopStream();
+    statusText.textContent = "Manual editing...";
+    preview.value = input.value;
+});
 
-    function stopStream() {
-        if (streamInterval) {
-            clearInterval(streamInterval);
-            streamInterval = null;
-        }
+function stopStream() {
+    if (streamInterval) {
+        clearInterval(streamInterval);
+        streamInterval = null;
     }
+}
 
-    // Initial Load
-    window.addEventListener('load', () => {
-        input.value = "# Hello Akari!\nTry clicking the **Load Showcase** button above.";
+// Initial Load
+window.addEventListener('load', () => {
+    // 簡單初始化
+    if(input.value.trim() === '') {
+        input.value = "# Hello Akari!\nTry clicking the **Stream** button.";
         preview.value = input.value;
-    });
+    }
+});
 
 </script>
 
