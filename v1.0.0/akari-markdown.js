@@ -3,7 +3,6 @@
  * (c) 2026 h-o-w-a-r-d
  * Released under the MIT License.
  * Repository: https://github.com/h-o-w-a-r-d/AKARI-Markdown.js
- * Documentation: https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/README.md
  */
 
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js';
