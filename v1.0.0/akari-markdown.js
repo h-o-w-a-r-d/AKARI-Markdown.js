@@ -7,7 +7,7 @@
  */
 
 // ==========================================
-// 硬編碼外部依賴 (使用穩定的 CDN 版本)
+// 外部依賴 (CDN)
 // ==========================================
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js';
 import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.es.min.js';
@@ -16,260 +16,124 @@ import hljs from 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/es/
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.esm.min.mjs';
 
 /**
- * 依賴的 CSS 資源連結
- * @constant {Object}
+ * Shadow DOM 內部需要的 CSS 資源
+ * 包含 KaTeX, Highlight.js 以及一個基礎的 Markdown 樣式 (GitHub Style)
  */
-const STYLES = {
-    katex: 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css',
-    highlight: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css' 
-};
+const SHADOW_STYLES = [
+    'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown-dark.min.css' // 預設使用 Dark Mode 樣式，可選
+];
 
 /**
- * Hook 函式定義
  * @typedef {Object} AkariHooks
- * @property {function(string): string} [beforeParse] - 在 Markdown 解析前觸發，接收原始字串，需回傳修改後的字串。
- * @property {function(string): string} [afterSanitize] - 在 HTML 淨化後觸發，接收純 HTML 字串，需回傳修改後的 HTML。
- * @property {function(HTMLElement): void} [onRendered] - DOM 更新完成後觸發，接收容器元素。
+ * @property {function(string): string} [beforeParse]
+ * @property {function(string): string} [afterSanitize]
+ * @property {function(HTMLElement): void} [onRendered]
  */
 
-/**
- * 初始化選項定義
- * @typedef {Object} AkariOptions
- * @property {string} [theme='default'] - Mermaid 圖表主題。
- * @property {string} [securityLevel='loose'] - Mermaid 安全性層級。
- * @property {number} [throttleInterval=50] - 文字渲染的節流間隔 (毫秒)，用於優化高頻串流輸入。
- * @property {number} [mermaidDebounce=800] - Mermaid 圖表渲染的防抖時間 (毫秒)，避免輸入未完成時報錯。
- * @property {AkariHooks} [hooks] - 生命週期鉤子物件。
- */
+export class AkariMarkdownElement extends HTMLElement {
+    
+    constructor() {
+        super();
+        // 1. 開啟 Shadow DOM
+        this.attachShadow({ mode: 'open' });
 
-/**
- * AkariMarkdown 渲染引擎類別
- * @class
- */
-export class AkariMarkdown {
+        // 2. 初始化內部容器 (加上 markdown-body class 以套用 GitHub 樣式)
+        this.container = document.createElement('div');
+        this.container.classList.add('markdown-body');
+        
+        // 為了確保樣式隔離且能滿版
+        const hostStyle = document.createElement('style');
+        hostStyle.textContent = `
+            :host { display: block; overflow: hidden; } 
+            .markdown-body { background: transparent; font-family: sans-serif; }
+            /* 修正 Mermaid 在 Shadow DOM 中的置中問題 */
+            .mermaid { display: flex; justify-content: center; margin: 1em 0; }
+        `;
 
-    /**
-     * 建立 AkariMarkdown 實例
-     * @param {HTMLElement|string} targetElement - 要渲染內容的目標 DOM 元素或是 CSS ID/Class 選擇器。
-     * @param {AkariOptions} [options={}] - 設定選項。
-     * @throws {Error} 如果找不到目標元素則拋出錯誤。
-     */
-    constructor(targetElement, options = {}) {
-        /**
-         * @type {HTMLElement}
-         * @private
-         */
-        this.container = typeof targetElement === 'string' 
-            ? document.querySelector(targetElement) 
-            : targetElement;
+        this.shadowRoot.appendChild(hostStyle);
+        this.shadowRoot.appendChild(this.container);
 
-        if (!this.container) {
-            throw new Error(`[AkariMarkdown] 找不到目標元素: ${targetElement}`);
-        }
+        // 3. 注入 CSS 到 Shadow Root
+        this._injectShadowStyles();
 
-        /**
-         * @type {AkariOptions}
-         * @private
-         */
+        // 4. 設定預設參數
         this.options = {
             theme: 'default',
-            securityLevel: 'loose',
             throttleInterval: 50,
-            mermaidDebounce: 500,
-            hooks: {},
-            ...options
+            mermaidDebounce: 800,
+            hooks: {}
         };
 
-        // 內部狀態變數
+        // 內部狀態
         this.counter = 0;
         this.mathMap = new Map();
         this.codeMap = new Map();
-        
-        // 防抖/節流計時器
         this._renderTimer = null;
         this._mermaidTimer = null;
         this._latestMarkdown = '';
         this._isRendering = false;
 
-        // 初始化
-        this._injectStyles();
+        // 初始化函式庫
         this._initLibraries();
     }
 
     /**
-     * 靜態方法：自動掃描並渲染頁面上符合選擇器的所有元素。
-     * 適合用於靜態頁面的一次性轉換。
-     * 
-     * @static
-     * @async
-     * @param {string} selector - CSS 選擇器 (例如: '.akari-md-content')。
-     * @param {AkariOptions} [options={}] - 共用的設定選項。
-     * @returns {Promise<void>} 當所有元素渲染完成後回傳 Promise。
-     * 
-     * @example
-     * AkariMarkdown.renderElements('.markdown-post');
+     * 當元素被加入 DOM 時觸發
      */
-    static async renderElements(selector, options = {}) {
-        const elements = document.querySelectorAll(selector);
-        const tasks = Array.from(elements).map(async (el) => {
-            // 優先讀取 data-markdown 屬性，其次讀取 textContent
-            let rawText = el.getAttribute('data-markdown') || el.textContent;
-            const renderer = new AkariMarkdown(el, options);
-            await renderer.render(rawText.trim());
-            // 渲染完成後顯示元素
-            el.style.display = 'block'; 
+    connectedCallback() {
+        // 如果標籤內部有初始文字，且沒有設定 no-render 屬性，則渲染它
+        if (!this.hasAttribute('no-render') && this.textContent.trim().length > 0) {
+            this.render(this.textContent.trim());
+        }
+    }
+
+    /**
+     * 設定 Markdown 內容 (這是主要的輸入介面)
+     * @param {string} val
+     */
+    set value(val) {
+        this.render(val);
+    }
+
+    /**
+     * 獲取當前 Markdown 原始碼
+     */
+    get value() {
+        return this._latestMarkdown;
+    }
+
+    /**
+     * 設定 Hook 與選項
+     * @param {Object} opts 
+     */
+    set config(opts) {
+        this.options = { ...this.options, ...opts };
+        // 如果 mermaid 主題變更，可能需要重新 init (這裡簡化處理)
+    }
+
+    /**
+     * 注入樣式到 Shadow Root
+     * 這確保了樣式只影響這個組件內部
+     */
+    _injectShadowStyles() {
+        SHADOW_STYLES.forEach(url => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = url;
+            // 插入到最前面，讓 hostStyle 權重較高
+            this.shadowRoot.insertBefore(link, this.shadowRoot.firstChild);
         });
-        await Promise.all(tasks);
     }
 
-    /**
-     * 渲染 Markdown 字串。
-     * 
-     * 針對 LLM 串流場景優化：
-     * 1. 文字渲染採用「節流 (Throttle)」機制，預設每 50ms 更新一次 DOM。
-     * 2. 圖表渲染採用「防抖 (Debounce)」機制，預設停頓 500ms 後才繪製。
-     * 
-     * @async
-     * @param {string} markdownText - 原始 Markdown 文字內容。
-     * @param {boolean} [force=false] - 是否強制立即渲染 (忽略節流機制)。通常在串流結束時設為 true。
-     * @returns {Promise<void>}
-     */
-    async render(markdownText, force = false) {
-        this._latestMarkdown = markdownText;
-
-        // 強制渲染 (例如串流結束)
-        if (force) {
-            this._clearTimers();
-            await this._performRender();
-            return;
-        }
-
-        // 節流邏輯：如果正在渲染或已有排程，則跳過
-        if (this._isRendering) return;
-
-        // 啟動節流計時器
-        if (!this._renderTimer) {
-            this._renderTimer = setTimeout(async () => {
-                this._isRendering = true;
-                await this._performRender();
-                this._isRendering = false;
-                this._renderTimer = null;
-                // 注意：在極高頻輸入下，可能會有殘留文字未渲染，建議串流結束時務必呼叫 render(text, true)
-            }, this.options.throttleInterval);
-        }
-    }
-
-    /**
-     * 執行核心渲染邏輯 (私有)
-     * @private
-     */
-    async _performRender() {
-        let text = this._latestMarkdown || '';
-
-        // Hook: beforeParse
-        if (this.options.hooks.beforeParse) {
-            text = this.options.hooks.beforeParse(text);
-        }
-
-        // 1. 重置對照表
-        this.mathMap.clear();
-        this.codeMap.clear();
-        this.counter = 0;
-
-        // 2. 保護特殊區塊 (程式碼與數學公式)
-        let processed = this._protectCodeAndMath(text);
-        
-        // 3. Marked 解析
-        let html = '';
-        try {
-            html = marked.parse(processed);
-        } catch (err) {
-            console.error('[AkariMarkdown] Parse error:', err);
-            html = `<p style="color:red">Markdown Parse Error</p>`;
-        }
-
-        // 4. DOMPurify 淨化
-        html = DOMPurify.sanitize(html, {
-            ADD_TAGS: ['iframe'],
-            ADD_ATTR: ['target', 'class'] 
-        });
-
-        // Hook: afterSanitize
-        if (this.options.hooks.afterSanitize) {
-            html = this.options.hooks.afterSanitize(html);
-        }
-
-        // 5. 還原並渲染數學公式 (KaTeX)
-        html = this._restoreAndRenderMath(html);
-
-        // 6. 更新 DOM
-        this.container.innerHTML = html;
-
-        // 7. 排程 Mermaid 渲染 (獨立防抖)
-        this._scheduleMermaidRender();
-
-        // Hook: onRendered
-        if (this.options.hooks.onRendered) {
-            this.options.hooks.onRendered(this.container);
-        }
-    }
-
-    /**
-     * 排程 Mermaid 渲染 (防抖)
-     * @private
-     */
-    _scheduleMermaidRender() {
-        if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
-        
-        this._mermaidTimer = setTimeout(async () => {
-            const nodes = this.container.querySelectorAll('.mermaid');
-            if (nodes.length === 0) return;
-            try {
-                await mermaid.run({ nodes, suppressErrors: true });
-            } catch (e) {
-                // 忽略串流過程中的語法錯誤
-            }
-        }, this.options.mermaidDebounce);
-    }
-
-    /**
-     * 清除所有計時器
-     * @private
-     */
-    _clearTimers() {
-        if (this._renderTimer) clearTimeout(this._renderTimer);
-        if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
-        this._renderTimer = null;
-        this._mermaidTimer = null;
-    }
-
-    /**
-     * 自動注入依賴的 CSS
-     * @private
-     */
-    _injectStyles() {
-        const loadStyle = (url, id) => {
-            if (!document.querySelector(`link[href="${url}"]`)) {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = url;
-                link.dataset.dependency = id;
-                document.head.appendChild(link);
-            }
-        };
-        loadStyle(STYLES.katex, 'katex-css');
-        loadStyle(STYLES.highlight, 'highlight-css');
-    }
-
-    /**
-     * 初始化 Marked 與 Mermaid 設定
-     * @private
-     */
     _initLibraries() {
+        // Mermaid 初始化 (全域設定，但這部分較難完全隔離)
+        // 建議在頁面載入時統一設定一次，或在此處設定
         mermaid.initialize({ 
             startOnLoad: false, 
             theme: this.options.theme,
-            securityLevel: this.options.securityLevel
+            securityLevel: 'loose'
         });
 
         const renderer = new marked.Renderer();
@@ -286,56 +150,140 @@ export class AkariMarkdown {
     }
 
     /**
-     * 保護代碼區塊與數學公式，避免被 Marked 錯誤解析
-     * @private
-     * @param {string} text 
-     * @returns {string}
+     * 渲染方法 (支援串流防抖)
      */
+    async render(markdownText, force = false) {
+        this._latestMarkdown = markdownText;
+
+        if (force) {
+            this._clearTimers();
+            await this._performRender();
+            return;
+        }
+
+        if (this._isRendering) return;
+
+        if (!this._renderTimer) {
+            this._renderTimer = setTimeout(async () => {
+                this._isRendering = true;
+                await this._performRender();
+                this._isRendering = false;
+                this._renderTimer = null;
+            }, this.options.throttleInterval);
+        }
+    }
+
+    async _performRender() {
+        let text = this._latestMarkdown || '';
+
+        // Hooks: beforeParse
+        if (this.options.hooks.beforeParse) {
+            text = this.options.hooks.beforeParse(text);
+        }
+
+        // Reset
+        this.mathMap.clear();
+        this.codeMap.clear();
+        this.counter = 0;
+
+        // Process
+        let processed = this._protectCodeAndMath(text);
+        
+        let html = '';
+        try {
+            html = marked.parse(processed);
+        } catch (err) {
+            console.error('AkariMarkdown Parse Error:', err);
+            html = `<p style="color:red">Parse Error</p>`;
+        }
+
+        // Sanitize
+        html = DOMPurify.sanitize(html, {
+            ADD_TAGS: ['iframe'],
+            ADD_ATTR: ['target', 'class'] 
+        });
+
+        // Hooks: afterSanitize
+        if (this.options.hooks.afterSanitize) {
+            html = this.options.hooks.afterSanitize(html);
+        }
+
+        // Restore Math
+        html = this._restoreAndRenderMath(html);
+
+        // Update Shadow DOM
+        this.container.innerHTML = html;
+
+        // Schedule Mermaid
+        this._scheduleMermaidRender();
+
+        // Hooks: onRendered
+        if (this.options.hooks.onRendered) {
+            this.options.hooks.onRendered(this.container);
+        }
+    }
+
+    _scheduleMermaidRender() {
+        if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
+        
+        this._mermaidTimer = setTimeout(async () => {
+            // 注意：這裡必須在 shadowRoot 內尋找 mermaid 節點
+            const nodes = this.container.querySelectorAll('.mermaid');
+            if (nodes.length === 0) return;
+            try {
+                // Mermaid 支援傳入 nodes 陣列，這樣可以處理 Shadow DOM 內的元素
+                await mermaid.run({ nodes, suppressErrors: true });
+            } catch (e) {
+                // console.warn('Mermaid incomplete syntax');
+            }
+        }, this.options.mermaidDebounce);
+    }
+
+    _clearTimers() {
+        if (this._renderTimer) clearTimeout(this._renderTimer);
+        if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
+        this._renderTimer = null;
+        this._mermaidTimer = null;
+    }
+
     _protectCodeAndMath(text) {
         let processed = text;
-        // 1. 保護 ```程式碼```
+        // Code Block
         processed = processed.replace(/(\n|^)```[\s\S]*?```/g, (match) => {
             const key = `CODEBLOCK${this.counter++}ENDCODE`; 
             this.codeMap.set(key, match);
             return key;
         });
-        // 2. 保護 `行內程式碼`
+        // Inline Code
         processed = processed.replace(/(`+)(.*?)\1/g, (match) => {
             const key = `CODEINLINE${this.counter++}ENDCODE`;
             this.codeMap.set(key, match);
             return key;
         });
-        // 3. 保護轉義 \$
+        // Escaped Dollar
         processed = processed.replace(/\\\$/g, (match) => {
             const key = `ESCAPEDDOLLAR${this.counter++}END`;
             this.codeMap.set(key, match);
             return key;
         });
-        // 4. 保護 $$區塊公式$$
+        // Math Block
         processed = processed.replace(/(^|\n)\$\$([\s\S]+?)\$\$($|\n)/g, (match, prefix, tex, suffix) => {
             const key = `MATHBLOCK${this.counter++}ENDMATH`;
             this.mathMap.set(key, { tex: tex, display: true });
             return prefix + key + suffix; 
         });
-        // 5. 保護 $行內公式$
+        // Inline Math
         processed = processed.replace(/\$([^\n]+?)\$/g, (match, tex) => {
-            // 排除中文常用句中的金錢符號誤判
             if (/[\u4e00-\u9fa5]/.test(tex) && !tex.includes('\\text')) return match; 
             const key = `MATHINLINE${this.counter++}ENDMATH`;
             this.mathMap.set(key, { tex: tex, display: false });
             return key;
         });
-        // 6. 還原程式碼 (交給 marked 處理)
+        // Restore Code
         this.codeMap.forEach((value, key) => processed = processed.replace(key, value));
         return processed;
     }
 
-    /**
-     * 還原數學公式佔位符並執行 KaTeX 渲染
-     * @private
-     * @param {string} html 
-     * @returns {string}
-     */
     _restoreAndRenderMath(html) {
         let result = html;
         this.mathMap.forEach((value, key) => {
@@ -353,3 +301,6 @@ export class AkariMarkdown {
         return result;
     }
 }
+
+// 註冊 Custom Element
+customElements.define('akari-markdown', AkariMarkdownElement);
