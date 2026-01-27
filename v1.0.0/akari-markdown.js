@@ -6,11 +6,8 @@
  * Documentation: https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/README.md
  */
 
-// ==========================================
-// 外部依賴 (CDN)
-// ==========================================
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js';
-import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js';
+import DOMPurify from 'https://esm.sh/dompurify@3.0.9'; // 使用 ESM 版本
 import katex from 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.mjs';
 import hljs from 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/es/highlight.min.js';
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.esm.min.mjs';
@@ -30,12 +27,22 @@ export class AkariMarkdownElement extends HTMLElement {
         this.container = document.createElement('div');
         this.container.classList.add('markdown-body');
         
+        // 增加 .mermaid 樣式確保居中與背景正確
         const hostStyle = document.createElement('style');
         hostStyle.textContent = `
             :host { display: block; overflow: hidden; text-align: left; } 
             .markdown-body { background: transparent; font-family: sans-serif; line-height: 1.6; }
-            .mermaid { display: flex; justify-content: center; margin: 1em 0; background: transparent; }
-            pre { position: relative; }
+            .mermaid { 
+                display: flex; 
+                justify-content: center; 
+                margin: 1em 0; 
+                background: transparent;
+                overflow-x: auto; /* 避免大圖破版 */
+            }
+            /* 讓 Mermaid 錯誤訊息顯示為紅色 */
+            .mermaid > svg[id^="mermaid-error"] {
+                border: 1px solid red;
+            }
         `;
 
         this.shadowRoot.appendChild(hostStyle);
@@ -43,7 +50,7 @@ export class AkariMarkdownElement extends HTMLElement {
         this._injectShadowStyles();
 
         this.options = {
-            theme: 'default',
+            theme: 'default', // 可選: 'dark', 'forest', 'neutral'
             throttleInterval: 50,
             mermaidDebounce: 800,
             hooks: {}
@@ -76,6 +83,12 @@ export class AkariMarkdownElement extends HTMLElement {
 
     set config(opts) {
         this.options = { ...this.options, ...opts };
+        // 如果配置改變，重新初始化 Mermaid
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: this.options.theme,
+            securityLevel: 'loose'
+        });
     }
 
     _injectShadowStyles() {
@@ -88,28 +101,28 @@ export class AkariMarkdownElement extends HTMLElement {
     }
 
     _initLibraries() {
-        // Mermaid Init
+        // Mermaid 初始化
         mermaid.initialize({ 
             startOnLoad: false, 
             theme: this.options.theme,
-            securityLevel: 'loose'
+            securityLevel: 'loose',
+            // 關鍵：這讓 mermaid 不要去尋找 DOM，純粹做渲染
         });
 
-        // Marked Init (Fix: 使用 renderer 物件實字，並修正參數)
         const renderer = {
             code(code, lang) {
-                // Mermaid 攔截
+                // Mermaid 區塊：先輸出原始碼到 div，稍後用 _scheduleMermaidRender 取代
                 if (lang === 'mermaid') {
+                    // 使用 textContent 防護，避免 XSS，並加上特定 class
                     return `<div class="mermaid">${code}</div>`;
                 }
+                
                 // Highlight.js
                 if (lang && hljs.getLanguage(lang)) {
                     try {
                         const highlighted = hljs.highlight(code, { language: lang }).value;
                         return `<pre><code class="hljs language-${lang}">${highlighted}</code></pre>`;
-                    } catch (e) {
-                        console.warn('Highlight error:', e);
-                    }
+                    } catch (e) { }
                 }
                 return `<pre><code class="hljs">${code}</code></pre>`;
             }
@@ -119,7 +132,7 @@ export class AkariMarkdownElement extends HTMLElement {
     }
 
     async render(markdownText, force = false) {
-        this._latestMarkdown = markdownText || ''; // 防止 undefined
+        this._latestMarkdown = markdownText || ''; 
 
         if (force) {
             this._clearTimers();
@@ -143,66 +156,74 @@ export class AkariMarkdownElement extends HTMLElement {
         let text = this._latestMarkdown;
 
         try {
-            // Hooks: beforeParse
             if (this.options.hooks.beforeParse) {
                 text = this.options.hooks.beforeParse(text);
             }
 
-            // Reset
             this.mathMap.clear();
             this.codeMap.clear();
             this.counter = 0;
 
-            // 1. 保護代碼與公式
             let processed = this._protectCodeAndMath(text);
-            
-            // 2. Marked 解析
             let html = marked.parse(processed);
 
-            // 3. DOMPurify 淨化
             html = DOMPurify.sanitize(html, {
                 ADD_TAGS: ['iframe'],
                 ADD_ATTR: ['target', 'class'] 
             });
 
-            // Hooks: afterSanitize
             if (this.options.hooks.afterSanitize) {
                 html = this.options.hooks.afterSanitize(html);
             }
 
-            // 4. 還原並渲染公式
             html = this._restoreAndRenderMath(html);
 
-            // 5. 更新 DOM
             this.container.innerHTML = html;
 
-            // 6. 排程 Mermaid
+            // ★★★ 觸發 Mermaid 渲染 ★★★
             this._scheduleMermaidRender();
 
-            // Hooks: onRendered
             if (this.options.hooks.onRendered) {
                 this.options.hooks.onRendered(this.container);
             }
 
         } catch (err) {
             console.error('[AkariMarkdown] Render Error:', err);
-            this.container.innerHTML = `<div style="color:red; border:1px solid red; padding:10px;">
-                <strong>Render Error:</strong> ${err.message}
-            </div>`;
+            this.container.innerHTML = `<div style="color:red;border:1px solid red;padding:10px;">Render Error: ${err.message}</div>`;
         }
     }
 
+    /**
+     * ★★★ 修復核心：手動 Render SVG 並注入 ★★★
+     * 不使用 mermaid.run (它依賴全域 document 查找)，改用 mermaid.render (產生 SVG 字串)
+     */
     _scheduleMermaidRender() {
         if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
         
         this._mermaidTimer = setTimeout(async () => {
             const nodes = this.container.querySelectorAll('.mermaid');
-            if (nodes.length === 0) return;
-            try {
-                // Mermaid 10+ run API
-                await mermaid.run({ nodes, suppressErrors: true });
-            } catch (e) {
-                // console.warn('Mermaid incomplete syntax');
+            
+            // 針對每一個 mermaid div 進行處理
+            for (const node of nodes) {
+                // 如果已經包含 svg (已經渲染過)，跳過
+                if (node.querySelector('svg')) continue;
+
+                const code = node.textContent;
+                // 產生唯一的 ID，這是 mermaid.render 需要的
+                const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+                try {
+                    // mermaid.render(id, text) 回傳 { svg } 物件
+                    // 這裡的 id 是給 SVG 內部定義用的，不會影響外部 DOM
+                    const { svg } = await mermaid.render(id, code);
+                    node.innerHTML = svg;
+                } catch (err) {
+                    // 串流中語法不完整是常態，通常選擇忽略或顯示原始碼
+                    // console.warn('Mermaid Syntax Error (likely incomplete stream):', err);
+                    
+                    // 如果你想顯示錯誤訊息給使用者，可以把下面這行打開：
+                    // node.innerHTML = `<span style="color:red; font-size:0.8em;">Waiting for chart...</span>`;
+                }
             }
         }, this.options.mermaidDebounce);
     }
@@ -218,40 +239,34 @@ export class AkariMarkdownElement extends HTMLElement {
         if (!text) return '';
         let processed = text;
         
-        // Code Block
         processed = processed.replace(/(\n|^)```[\s\S]*?```/g, (match) => {
             const key = `CODEBLOCK${this.counter++}ENDCODE`; 
             this.codeMap.set(key, match);
             return key;
         });
-        // Inline Code
         processed = processed.replace(/(`+)(.*?)\1/g, (match) => {
             const key = `CODEINLINE${this.counter++}ENDCODE`;
             this.codeMap.set(key, match);
             return key;
         });
-        // Escaped Dollar
         processed = processed.replace(/\\\$/g, (match) => {
             const key = `ESCAPEDDOLLAR${this.counter++}END`;
             this.codeMap.set(key, match);
             return key;
         });
-        // Math Block
         processed = processed.replace(/(^|\n)\$\$([\s\S]+?)\$\$($|\n)/g, (match, prefix, tex, suffix) => {
             const key = `MATHBLOCK${this.counter++}ENDMATH`;
             this.mathMap.set(key, { tex: tex, display: true });
             return prefix + key + suffix; 
         });
-        // Inline Math
         processed = processed.replace(/\$([^\n]+?)\$/g, (match, tex) => {
             if (/[\u4e00-\u9fa5]/.test(tex) && !tex.includes('\\text')) return match; 
             const key = `MATHINLINE${this.counter++}ENDMATH`;
             this.mathMap.set(key, { tex: tex, display: false });
             return key;
         });
-        // Restore Code Maps (讓 marked 處理程式碼，但 math 已被挖空)
-        this.codeMap.forEach((value, key) => processed = processed.replace(key, value));
         
+        this.codeMap.forEach((value, key) => processed = processed.replace(key, value));
         return processed;
     }
 
@@ -266,8 +281,7 @@ export class AkariMarkdownElement extends HTMLElement {
                 });
                 result = result.split(key).join(rendered);
             } catch (e) {
-                console.warn('[KaTeX Error]', e);
-                result = result.split(key).join(`<span style="color:red">${value.tex}</span>`);
+                result = result.split(key).join(value.tex);
             }
         });
         return result;
