@@ -708,8 +708,8 @@ if(btnStream) {
         // 使用更短的間隔
         streamInterval = setInterval(() => {
             // ★★★ 加速關鍵：大幅增加 Chunk Size ★★★
-            // 每次隨機輸出 10 到 50 個字元，這比原本的 2-6 快很多
-            const chunkSize = Math.floor(Math.random() * 40) + 10;
+            // 每次隨機輸出 5 到 30 個字元
+            const chunkSize = Math.floor(Math.random() * 25) + 5;
             const chunk = content.slice(index, index + chunkSize);
             
             if (!chunk) {
