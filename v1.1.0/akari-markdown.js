@@ -1,7 +1,7 @@
 /* --- START OF FILE akari-markdown.js --- */
 
 /*!
- * AKARI-Markdown.js v1.2.0 (Fix Mermaid Rendering)
+ * AKARI-Markdown.js v1.1.0 (Fix Mermaid Rendering)
  * (c) 2026 h-o-w-a-r-d
  * Released under the MIT License.
  * Repository: https://github.com/h-o-w-a-r-d/AKARI-Markdown.js
