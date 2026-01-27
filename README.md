@@ -29,7 +29,7 @@
 Add the script to your HTML. Since it uses ES Modules and imports dependencies from CDNs, no build step is required.
 
 ```html
-<script type="module" src="./js/akari-markdown.js"></script>
+<script type="module" src="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.0.0/akari-markdown.min.js"></script>
 ```
 
 ### 2. Use the Custom Element
