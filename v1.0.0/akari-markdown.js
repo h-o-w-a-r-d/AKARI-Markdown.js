@@ -6,7 +6,7 @@
  */
 
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js';
-import DOMPurify from 'https://esm.sh/dompurify@3.0.9'; // 使用 ESM 版本
+import DOMPurify from 'https://esm.sh/dompurify@3.0.9';
 import katex from 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.mjs';
 import hljs from 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/es/highlight.min.js';
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.esm.min.mjs';
@@ -26,21 +26,33 @@ export class AkariMarkdownElement extends HTMLElement {
         this.container = document.createElement('div');
         this.container.classList.add('markdown-body');
         
-        // 增加 .mermaid 樣式確保居中與背景正確
+        // ★★★ 樣式修復 ★★★
         const hostStyle = document.createElement('style');
         hostStyle.textContent = `
             :host { display: block; overflow: hidden; text-align: left; } 
-            .markdown-body { background: transparent; font-family: sans-serif; line-height: 1.6; }
+            .markdown-body { 
+                background: transparent; 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; 
+                line-height: 1.6; 
+            }
             .mermaid { 
                 display: flex; 
                 justify-content: center; 
-                margin: 1em 0; 
-                background: transparent;
-                overflow-x: auto; /* 避免大圖破版 */
+                margin: 1.5em 0; 
+                background: rgba(255, 255, 255, 0.02); /* 極淡的背景襯托 */
+                border-radius: 8px;
+                padding: 10px;
+                overflow-x: auto;
             }
-            /* 讓 Mermaid 錯誤訊息顯示為紅色 */
-            .mermaid > svg[id^="mermaid-error"] {
-                border: 1px solid red;
+            /* 當渲染失敗退回原始碼時的樣式 */
+            .mermaid-source {
+                font-family: Consolas, Monaco, 'Andale Mono', monospace;
+                font-size: 0.85em;
+                color: #8b949e; /* 灰色文字，表示未就緒 */
+                white-space: pre-wrap;
+                text-align: left;
+                width: 100%;
+                opacity: 0.8;
             }
         `;
 
@@ -49,9 +61,9 @@ export class AkariMarkdownElement extends HTMLElement {
         this._injectShadowStyles();
 
         this.options = {
-            theme: 'default', // 可選: 'dark', 'forest', 'neutral'
+            theme: 'dark', // ★★★ 改為 dark 主題，適配深色背景 ★★★
             throttleInterval: 50,
-            mermaidDebounce: 800,
+            mermaidDebounce: 800, // 圖表防抖動時間
             hooks: {}
         };
 
@@ -86,7 +98,8 @@ export class AkariMarkdownElement extends HTMLElement {
         mermaid.initialize({ 
             startOnLoad: false, 
             theme: this.options.theme,
-            securityLevel: 'loose'
+            securityLevel: 'loose',
+            suppressErrorRendering: true // 嘗試抑制默認錯誤渲染
         });
     }
 
@@ -100,23 +113,20 @@ export class AkariMarkdownElement extends HTMLElement {
     }
 
     _initLibraries() {
-        // Mermaid 初始化
         mermaid.initialize({ 
             startOnLoad: false, 
             theme: this.options.theme,
             securityLevel: 'loose',
-            // 關鍵：這讓 mermaid 不要去尋找 DOM，純粹做渲染
         });
 
         const renderer = {
             code(code, lang) {
-                // Mermaid 區塊：先輸出原始碼到 div，稍後用 _scheduleMermaidRender 取代
                 if (lang === 'mermaid') {
-                    // 使用 textContent 防護，避免 XSS，並加上特定 class
+                    // 先輸出原始碼，並加上特定 class
+                    // 注意：這裡先進行 HTML 轉義，防止在切換瞬間的 XSS
                     return `<div class="mermaid">${code}</div>`;
                 }
                 
-                // Highlight.js
                 if (lang && hljs.getLanguage(lang)) {
                     try {
                         const highlighted = hljs.highlight(code, { language: lang }).value;
@@ -179,7 +189,6 @@ export class AkariMarkdownElement extends HTMLElement {
 
             this.container.innerHTML = html;
 
-            // ★★★ 觸發 Mermaid 渲染 ★★★
             this._scheduleMermaidRender();
 
             if (this.options.hooks.onRendered) {
@@ -193,8 +202,7 @@ export class AkariMarkdownElement extends HTMLElement {
     }
 
     /**
-     * ★★★ 修復核心：手動 Render SVG 並注入 ★★★
-     * 不使用 mermaid.run (它依賴全域 document 查找)，改用 mermaid.render (產生 SVG 字串)
+     * ★★★ 修復核心：錯誤攔截與狀態管理 ★★★
      */
     _scheduleMermaidRender() {
         if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
@@ -202,26 +210,25 @@ export class AkariMarkdownElement extends HTMLElement {
         this._mermaidTimer = setTimeout(async () => {
             const nodes = this.container.querySelectorAll('.mermaid');
             
-            // 針對每一個 mermaid div 進行處理
             for (const node of nodes) {
-                // 如果已經包含 svg (已經渲染過)，跳過
+                // 如果已經包含 svg，跳過
                 if (node.querySelector('svg')) continue;
 
-                const code = node.textContent;
-                // 產生唯一的 ID，這是 mermaid.render 需要的
+                const code = node.textContent; 
                 const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
                 try {
-                    // mermaid.render(id, text) 回傳 { svg } 物件
-                    // 這裡的 id 是給 SVG 內部定義用的，不會影響外部 DOM
+                    // 嘗試渲染
                     const { svg } = await mermaid.render(id, code);
                     node.innerHTML = svg;
                 } catch (err) {
-                    // 串流中語法不完整是常態，通常選擇忽略或顯示原始碼
-                    // console.warn('Mermaid Syntax Error (likely incomplete stream):', err);
+                    // ★★★ 關鍵修復 ★★★
+                    // 當 Mermaid 拋出錯誤（通常是語法不完整），我們不顯示錯誤圖標
+                    // 而是顯示原始代碼，這在串流時非常自然（看起來像還在輸入）
+                    // 使用 _escapeHtml 防止 XSS
+                    node.innerHTML = `<div class="mermaid-source">${this._escapeHtml(code)}</div>`;
                     
-                    // 如果你想顯示錯誤訊息給使用者，可以把下面這行打開：
-                    // node.innerHTML = `<span style="color:red; font-size:0.8em;">Waiting for chart...</span>`;
+                    // console.debug('Mermaid rendering skipped (incomplete syntax)', err);
                 }
             }
         }, this.options.mermaidDebounce);
@@ -284,6 +291,18 @@ export class AkariMarkdownElement extends HTMLElement {
             }
         });
         return result;
+    }
+
+    // 簡單的 HTML 轉義，用於安全顯示原始碼
+    _escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
     }
 }
 
