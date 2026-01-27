@@ -26,7 +26,6 @@ export class AkariMarkdownElement extends HTMLElement {
         this.container = document.createElement('div');
         this.container.classList.add('markdown-body');
         
-        // ★★★ 樣式修復 ★★★
         const hostStyle = document.createElement('style');
         hostStyle.textContent = `
             :host { display: block; overflow: hidden; text-align: left; } 
@@ -39,16 +38,16 @@ export class AkariMarkdownElement extends HTMLElement {
                 display: flex; 
                 justify-content: center; 
                 margin: 1.5em 0; 
-                background: rgba(255, 255, 255, 0.02); /* 極淡的背景襯托 */
+                background: rgba(255, 255, 255, 0.02);
                 border-radius: 8px;
                 padding: 10px;
                 overflow-x: auto;
             }
-            /* 當渲染失敗退回原始碼時的樣式 */
+            /* 原始碼退回模式的樣式 */
             .mermaid-source {
                 font-family: Consolas, Monaco, 'Andale Mono', monospace;
                 font-size: 0.85em;
-                color: #8b949e; /* 灰色文字，表示未就緒 */
+                color: #8b949e; 
                 white-space: pre-wrap;
                 text-align: left;
                 width: 100%;
@@ -61,9 +60,9 @@ export class AkariMarkdownElement extends HTMLElement {
         this._injectShadowStyles();
 
         this.options = {
-            theme: 'dark', // ★★★ 改為 dark 主題，適配深色背景 ★★★
+            theme: 'dark', // 保持 dark 主題
             throttleInterval: 50,
-            mermaidDebounce: 800, // 圖表防抖動時間
+            mermaidDebounce: 800,
             hooks: {}
         };
 
@@ -94,13 +93,7 @@ export class AkariMarkdownElement extends HTMLElement {
 
     set config(opts) {
         this.options = { ...this.options, ...opts };
-        // 如果配置改變，重新初始化 Mermaid
-        mermaid.initialize({ 
-            startOnLoad: false, 
-            theme: this.options.theme,
-            securityLevel: 'loose',
-            suppressErrorRendering: true // 嘗試抑制默認錯誤渲染
-        });
+        this._initMermaidConfig();
     }
 
     _injectShadowStyles() {
@@ -113,17 +106,12 @@ export class AkariMarkdownElement extends HTMLElement {
     }
 
     _initLibraries() {
-        mermaid.initialize({ 
-            startOnLoad: false, 
-            theme: this.options.theme,
-            securityLevel: 'loose',
-        });
+        this._initMermaidConfig();
 
         const renderer = {
             code(code, lang) {
                 if (lang === 'mermaid') {
-                    // 先輸出原始碼，並加上特定 class
-                    // 注意：這裡先進行 HTML 轉義，防止在切換瞬間的 XSS
+                    // 使用 div 包裹並加上 class，稍後處理
                     return `<div class="mermaid">${code}</div>`;
                 }
                 
@@ -138,6 +126,24 @@ export class AkariMarkdownElement extends HTMLElement {
         };
 
         marked.use({ renderer });
+    }
+
+    // 獨立出來配置 Mermaid，確保配置更新時也能生效
+    _initMermaidConfig() {
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: this.options.theme,
+            securityLevel: 'loose',
+            suppressErrorRendering: true, // 嘗試告訴 Mermaid 不要渲染錯誤
+        });
+
+        // ★★★ 關鍵修復：覆蓋 Mermaid 的預設錯誤處理器 ★★★
+        // 這會阻止 Mermaid 在 document body 底部插入紅色的錯誤 SVG
+        mermaid.parseError = function(err, hash) {
+            // 這裡留空，什麼都不做。
+            // 錯誤會繼續拋出，並由我們的 catch 區塊接管。
+            // console.debug('Mermaid parse error suppressed:', err);
+        };
     }
 
     async render(markdownText, force = false) {
@@ -201,9 +207,6 @@ export class AkariMarkdownElement extends HTMLElement {
         }
     }
 
-    /**
-     * ★★★ 修復核心：錯誤攔截與狀態管理 ★★★
-     */
     _scheduleMermaidRender() {
         if (this._mermaidTimer) clearTimeout(this._mermaidTimer);
         
@@ -211,24 +214,30 @@ export class AkariMarkdownElement extends HTMLElement {
             const nodes = this.container.querySelectorAll('.mermaid');
             
             for (const node of nodes) {
-                // 如果已經包含 svg，跳過
                 if (node.querySelector('svg')) continue;
 
                 const code = node.textContent; 
                 const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
                 try {
-                    // 嘗試渲染
                     const { svg } = await mermaid.render(id, code);
                     node.innerHTML = svg;
                 } catch (err) {
-                    // ★★★ 關鍵修復 ★★★
-                    // 當 Mermaid 拋出錯誤（通常是語法不完整），我們不顯示錯誤圖標
-                    // 而是顯示原始代碼，這在串流時非常自然（看起來像還在輸入）
-                    // 使用 _escapeHtml 防止 XSS
+                    // 1. 顯示原始碼作為退回方案
                     node.innerHTML = `<div class="mermaid-source">${this._escapeHtml(code)}</div>`;
                     
-                    // console.debug('Mermaid rendering skipped (incomplete syntax)', err);
+                    // 2. ★★★ 防禦性清除 ★★★
+                    // 即使我們覆蓋了 parseError，有時 Mermaid 還是會嘗試建立一個帶有 ID 的元素
+                    // 為了確保萬無一失，我們檢查文檔中是否存在這個 ID 的元素並移除它
+                    const strayErrorElement = document.getElementById('d' + id);
+                    if (strayErrorElement) {
+                        strayErrorElement.remove();
+                    }
+                    // 有些版本的 mermaid 會直接用 id 當作錯誤框 id
+                    const directErrorElement = document.getElementById(id);
+                    if (directErrorElement && directErrorElement !== node) {
+                         directErrorElement.remove();
+                    }
                 }
             }
         }, this.options.mermaidDebounce);
@@ -293,7 +302,6 @@ export class AkariMarkdownElement extends HTMLElement {
         return result;
     }
 
-    // 簡單的 HTML 轉義，用於安全顯示原始碼
     _escapeHtml(text) {
         const map = {
             '&': '&amp;',
