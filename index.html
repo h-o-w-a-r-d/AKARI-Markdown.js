@@ -1,14 +1,16 @@
+<!-- START OF FILE index.html -->
+
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akari Markdown 全功能展示</title>
+    <title>AKARI-Markdown.js Demo</title>
     <style>
         /* =========================================
-           1. 外部樣式汙染測試 (Global Style Pollution)
-           這裡故意寫一些很醜、很具破壞性的樣式。
-           如果 Shadow DOM 運作正常，右側預覽區完全不應受到影響。
+           1. Global Style Pollution Test
+           Intentionally ugly styles to test Shadow DOM isolation.
+           If Shadow DOM works, the preview on the right should remain unaffected.
            ========================================= */
         body {
             margin: 0;
@@ -22,7 +24,7 @@
             flex-direction: column;
         }
 
-        /* 試圖破壞 H1, H2, p, code 的樣式 */
+        /* Attempts to break H1, H2, p, code styles */
         h1 { color: #ff00ff; text-decoration: underline; font-size: 50px; text-transform: uppercase; }
         p { color: yellow; font-size: 24px; letter-spacing: 5px; }
         code { background: red; color: white; border: 5px solid yellow; }
@@ -30,7 +32,7 @@
         blockquote { border-left: 10px solid red; background: yellow; color: black; }
 
         /* =========================================
-           2. 版面佈局 (Layout)
+           2. Layout
            ========================================= */
         header {
             background: #2d2d2d;
@@ -43,7 +45,7 @@
         }
 
         h1.app-title {
-            /* 這是 Header 的標題，會被上面的污染樣式影響 (變成粉紅色大字) 是正常的 */
+            /* This header title will be affected by pollution (pink/uppercase), which is expected */
             margin: 0;
             font-size: 24px;
             text-transform: none;
@@ -57,7 +59,7 @@
             overflow: hidden;
         }
 
-        /* 左側控制區 */
+        /* Left Panel: Control & Input */
         .panel-left {
             width: 400px;
             background: #252526;
@@ -87,25 +89,26 @@
             outline: none;
         }
 
-        /* 右側預覽區 */
+        /* Right Panel: Preview */
         .panel-right {
             flex: 1;
             background: #0d1117; /* GitHub Dark Background */
             position: relative;
             display: flex;
             flex-direction: column;
+            overflow: hidden; /* Ensure flex child scrolling works */
         }
 
-        /* 這裡設定 akari-markdown 組件的大小 */
+        /* Defining the akari-markdown component dimensions */
         akari-markdown {
             flex: 1;
             padding: 40px;
-            overflow-y: auto;
-            /* 平滑捲動 */
+            overflow-y: auto; /* Scrollbar is here */
+            /* Smooth scrolling */
             scroll-behavior: smooth;
         }
 
-        /* 按鈕樣式 (重置 p 的汙染) */
+        /* Button Styles (Resetting pollution) */
         button {
             padding: 8px 16px;
             background: #0e639c;
@@ -120,7 +123,7 @@
         button:disabled { background: #555; cursor: not-allowed; }
         button.secondary { background: #444; }
 
-        /* 狀態列 */
+        /* Status Bar */
         .status-bar {
             padding: 5px 10px;
             background: #007acc;
@@ -129,9 +132,10 @@
             font-family: monospace;
             display: flex;
             justify-content: space-between;
+            flex-shrink: 0;
         }
         
-        /* 修復左側說明文字被全局樣式汙染的問題，為了讓介面能看 */
+        /* Fix left panel text pollution for UI readability */
         .panel-left p {
             font-size: 14px;
             color: #aaa;
@@ -143,30 +147,30 @@
 <body>
 
 <header>
-    <!-- 這個標題會被污染成粉紅色，證明外部樣式生效中 -->
-    <h1 class="app-title">Akari Markdown Demo</h1>
+    <!-- This title will be pink due to pollution, proving external styles are active -->
+    <h1 class="app-title">AKARI-Markdown.js Demo</h1>
     <div style="font-size: 12px; color: #aaa;">
-        左側：輸入 / 模擬串流 &nbsp;|&nbsp; 右側：Web Component (Shadow DOM)
+        Left: Input / Stream Sim &nbsp;|&nbsp; Right: Web Component (Shadow DOM)
     </div>
 </header>
 
 <div class="main-container">
-    <!-- 左側：控制與輸入 -->
+    <!-- Left: Controls & Input -->
     <div class="panel-left">
         <div class="toolbar">
-            <button id="btn-showcase">📝 載入全功能範例</button>
-            <button id="btn-stream">🚀 模擬 LLM 串流</button>
-            <button id="btn-clear" class="secondary">🗑️ 清空</button>
+            <button id="btn-showcase">📝 Load Showcase</button>
+            <button id="btn-stream">🚀 Simulate Stream</button>
+            <button id="btn-clear" class="secondary">🗑️ Clear</button>
         </div>
-        <p>手動編輯下方內容，或點擊按鈕測試：</p>
-        <textarea id="source-input" placeholder="在此輸入 Markdown..."></textarea>
+        <p>Edit manually below or use buttons to test:</p>
+        <textarea id="source-input" placeholder="Type Markdown here..."></textarea>
     </div>
 
-    <!-- 右側：預覽組件 -->
+    <!-- Right: Preview Component -->
     <div class="panel-right">
         <!-- 
             ★★★ Web Component ★★★ 
-            注意：這裡沒有任何 class，所有樣式都在組件內部
+            Note: No classes here, style isolation is handled internally.
         -->
         <akari-markdown id="preview"></akari-markdown>
         
@@ -177,11 +181,11 @@
     </div>
 </div>
 
-<!-- 引入模組 -->
+<!-- Import Module -->
 <script type="module" src="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.0.0/akari-markdown.js"></script>
 
 <script type="module">
-    // 準備一個包含所有語法的複雜 Markdown
+    // Prepare a complex Markdown string containing all features
     const SHOWCASE_CONTENT = `
 # Akari Markdown Feature Showcase
 
@@ -628,7 +632,7 @@ xychart-beta
 <iframe src="javascript:alert(1)"></iframe>
 `;
 
-    // 取得元素
+    // Elements
     const input = document.getElementById('source-input');
     const preview = document.getElementById('preview');
     const statusText = document.getElementById('status-text');
@@ -637,87 +641,90 @@ xychart-beta
     let renderCount = 0;
     let streamInterval = null;
 
-    // 1. 設定 Hooks 監聽渲染狀態
+    // 1. Configure Hooks
     preview.config = {
-        throttleInterval: 30,  // 文字更新頻率
-        mermaidDebounce: 800,  // 圖表防抖時間
+        throttleInterval: 10,  // Text update frequency
+        mermaidDebounce: 800,  // Diagram debounce
         hooks: {
-            // 在 DOM 更新完成後觸發
+            // Triggered after DOM update
             onRendered: (el) => {
                 renderCount++;
                 renderCountEl.textContent = `Render Count: ${renderCount}`;
                 
-                // 自動捲動到底部 (模擬聊天視窗行為)
-                // 這裡要判斷是否正在串流，如果是才捲動
+                // Auto-scroll to bottom (Chat interface behavior)
+                // Only scroll if we are actively streaming
                 if (streamInterval) {
-                    el.scrollTop = el.scrollHeight;
+                    // ★★★ SCROLL FIX ★★★
+                    // Explicitly scroll the preview element itself (the host of Shadow DOM)
+                    // This ensures only the right panel scrolls, not the window or left panel
+                    preview.scrollTop = preview.scrollHeight;
                 }
             },
             beforeParse: (md) => {
-                // 可以在這裡做一些前處理，例如將 \n 轉為 <br>
+                // Pre-processing hook
                 return md; 
             }
         }
     };
 
-    // 2. 綁定按鈕功能
+    // 2. Event Listeners
     
-    // 功能展示
+    // Load Showcase
     document.getElementById('btn-showcase').addEventListener('click', () => {
         stopStream();
         input.value = SHOWCASE_CONTENT;
         preview.value = SHOWCASE_CONTENT;
-        statusText.textContent = "已載入全功能範例";
+        statusText.textContent = "Showcase content loaded";
     });
 
-    // 清空
+    // Clear
     document.getElementById('btn-clear').addEventListener('click', () => {
         stopStream();
         input.value = '';
         preview.value = '';
-        statusText.textContent = "已清空";
+        statusText.textContent = "Cleared";
     });
 
-    // 模擬 LLM 串流
+    // Simulate Stream
     document.getElementById('btn-stream').addEventListener('click', () => {
         stopStream();
-        statusText.textContent = "🚀 串流模擬中...";
-        preview.value = ''; // 先清空預覽
+        statusText.textContent = "🚀 Streaming...";
+        preview.value = ''; // Clear preview
         input.value = '';
         
         const content = SHOWCASE_CONTENT;
         let index = 0;
         
-        // 模擬網路延遲與封包大小不一
+        // Simulate network latency and chunks
         streamInterval = setInterval(() => {
-            // 每次隨機增加 2 ~ 8 個字元
+            // Random chunk size between 2 and 8 chars
             const chunkSize = Math.floor(Math.random() * 6) + 2;
             const chunk = content.slice(index, index + chunkSize);
             
             if (!chunk) {
                 stopStream();
-                statusText.textContent = "✅ 串流完成";
+                statusText.textContent = "✅ Stream completed";
                 return;
             }
             
             const currentText = input.value + chunk;
             input.value = currentText;
             
-            // ★★★ 核心：直接設定 value，組件會自動處理節流 ★★★
+            // ★★★ CORE: Update value, component handles throttling ★★★
             preview.value = currentText;
             
             index += chunkSize;
             
-            // 滾動輸入框
+            // Scroll the input textarea (Left side)
             input.scrollTop = input.scrollHeight;
 
-        }, 20); // 每 20ms 進一次資料 (速度很快)
+        }, 20); // Fast stream (20ms)
     });
 
-    // 3. 綁定手動輸入
+    // 3. Manual Input
     input.addEventListener('input', () => {
-        stopStream(); // 如果手動輸入就停止自動串流
-        statusText.textContent = "手動編輯中...";
+        stopStream(); // Stop stream on manual input
+        statusText.textContent = "Manual editing...";
         preview.value = input.value;
     });
 
@@ -728,9 +735,9 @@ xychart-beta
         }
     }
 
-    // 初始載入
+    // Initial Load
     window.addEventListener('load', () => {
-        input.value = "# Hello Akari!\n試著點擊上方的 **全功能範例** 按鈕。";
+        input.value = "# Hello Akari!\nTry clicking the **Load Showcase** button above.";
         preview.value = input.value;
     });
 
