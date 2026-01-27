@@ -3,88 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Component Markdown</title>
-    
-    <!-- 全域樣式：測試樣式隔離 -->
+    <title>Akari Markdown 全功能展示</title>
     <style>
-        body { background: #eee; font-family: sans-serif; padding: 20px; }
-        /* 這裡定義的 h1 不會影響 Akari 內部的 h1 */
-        h1 { color: red; text-align: center; } 
-        /* 這裡定義的 p 不會影響內部 */
-        p { color: blue; }
+        /* =========================================
+           1. 外部樣式汙染測試 (Global Style Pollution)
+           這裡故意寫一些很醜、很具破壞性的樣式。
+           如果 Shadow DOM 運作正常，右側預覽區完全不應受到影響。
+           ========================================= */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ddd;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 試圖破壞 H1, H2, p, code 的樣式 */
+        h1 { color: #ff00ff; text-decoration: underline; font-size: 50px; text-transform: uppercase; }
+        p { color: yellow; font-size: 24px; letter-spacing: 5px; }
+        code { background: red; color: white; border: 5px solid yellow; }
+        pre { background: pink; }
+        blockquote { border-left: 10px solid red; background: yellow; color: black; }
+
+        /* =========================================
+           2. 版面佈局 (Layout)
+           ========================================= */
+        header {
+            background: #2d2d2d;
+            padding: 10px 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        h1.app-title {
+            /* 這是 Header 的標題，會被上面的污染樣式影響 (變成粉紅色大字) 是正常的 */
+            margin: 0;
+            font-size: 24px;
+            text-transform: none;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左側控制區 */
+        .panel-left {
+            width: 400px;
+            background: #252526;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #444;
+        }
+
+        .toolbar {
+            padding: 10px;
+            background: #333;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        textarea {
+            flex: 1;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 15px;
+            resize: none;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            outline: none;
+        }
+
+        /* 右側預覽區 */
+        .panel-right {
+            flex: 1;
+            background: #0d1117; /* GitHub Dark Background */
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 這裡設定 akari-markdown 組件的大小 */
+        akari-markdown {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            /* 平滑捲動 */
+            scroll-behavior: smooth;
+        }
+
+        /* 按鈕樣式 (重置 p 的汙染) */
+        button {
+            padding: 8px 16px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1177bb; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button.secondary { background: #444; }
+
+        /* 狀態列 */
+        .status-bar {
+            padding: 5px 10px;
+            background: #007acc;
+            color: white;
+            font-size: 12px;
+            font-family: monospace;
+            display: flex;
+            justify-content: space-between;
+        }
         
-        .chat-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        /* 修復左側說明文字被全局樣式汙染的問題，為了讓介面能看 */
+        .panel-left p {
+            font-size: 14px;
+            color: #aaa;
+            letter-spacing: normal;
+            margin: 5px 10px;
         }
     </style>
 </head>
 <body>
 
-    <h1>外部 H1 (紅色) - 不應影響內部</h1>
-    <p>外部 P (藍色) - 不應影響內部</p>
+<header>
+    <!-- 這個標題會被污染成粉紅色，證明外部樣式生效中 -->
+    <h1 class="app-title">Akari Markdown Demo</h1>
+    <div style="font-size: 12px; color: #aaa;">
+        左側：輸入 / 模擬串流 &nbsp;|&nbsp; 右側：Web Component (Shadow DOM)
+    </div>
+</header>
 
-    <div class="chat-container">
-        <!-- 使用自定義標籤 -->
-        <akari-markdown id="ai-output"></akari-markdown>
+<div class="main-container">
+    <!-- 左側：控制與輸入 -->
+    <div class="panel-left">
+        <div class="toolbar">
+            <button id="btn-showcase">📝 載入全功能範例</button>
+            <button id="btn-stream">🚀 模擬 LLM 串流</button>
+            <button id="btn-clear" class="secondary">🗑️ 清空</button>
+        </div>
+        <p>手動編輯下方內容，或點擊按鈕測試：</p>
+        <textarea id="source-input" placeholder="在此輸入 Markdown..."></textarea>
     </div>
 
-    <script type="module">
-        import 'https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.0.0/akari-markdown.min.js';
+    <!-- 右側：預覽組件 -->
+    <div class="panel-right">
+        <!-- 
+            ★★★ Web Component ★★★ 
+            注意：這裡沒有任何 class，所有樣式都在組件內部
+        -->
+        <akari-markdown id="preview"></akari-markdown>
+        
+        <div class="status-bar">
+            <span id="status-text">Ready</span>
+            <span id="render-count">Render Count: 0</span>
+        </div>
+    </div>
+</div>
 
-        const output = document.getElementById('ai-output');
+<!-- 引入模組 -->
+<script type="module" src="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.0.0/akari-markdown.min.js"></script>
 
-        // (選用) 設定 Hook
-        output.setup({
-            hooks: {
-                onRendered: (container) => {
-                    console.log('Shadow DOM 更新完畢，高度:', container.scrollHeight);
-                }
-            }
-        });
+<script type="module">
+    // 準備一個包含所有語法的複雜 Markdown
+    const SHOWCASE_CONTENT = `
+# Akari Markdown 功能展示
 
-        // 模擬串流
-        const text = `
-# 內部 H1 (應為預設黑/灰色)
-這是一段測試文字，應該是標準顏色而非藍色。
+歡迎使用 **Akari Markdown**。這是一個基於 Shadow DOM 的 Web Component，確保樣式隔離且支援串流輸出。
 
-## 數學測試
-$$ E = mc^2 $$
+> **注意觀察**：頁面外部的 \`H1\` 是粉紅色的，\`P\` 是黃色的，但在這個區塊內，樣式保持乾淨的 GitHub 風格。
 
-## 程式碼測試 (Shadow DOM 樣式注入)
+---
+
+## 1. 數學公式 (KaTeX)
+支援行內與區塊公式，渲染快速。
+
+- **行內**：質能互換 $E = mc^2$ 與歐拉恆等式 $e^{i\\pi} + 1 = 0$。
+- **區塊** (高斯積分)：
+$$
+\\int_{-\\infty}^\\infty e^{-x^2} dx = \\sqrt{\\pi}
+$$
+
+矩陣範例：
+$$
+A = \\begin{pmatrix}
+a & b \\\\
+c & d
+\\end{pmatrix}
+$$
+
+---
+
+## 2. 程式碼高亮 (Highlight.js)
+支援自動偵測語言與行號樣式。
+
 \`\`\`javascript
-const webComponent = true;
-console.log('Style Isolated!');
+// 即使在 Shadow DOM 內，高亮也能正常運作
+class Greeter {
+    constructor(name) {
+        this.name = name;
+    }
+    
+    sayHello() {
+        console.log(\`Hello, \${this.name}!\`);
+    }
+}
 \`\`\`
 
-## Mermaid 圖表
-\`\`\`mermaid
-graph LR
-    A[Shadow Host] -->|包含| B(Shadow Root)
-    B -->|包含| C[Style CSS]
-    B -->|包含| D[Markdown Content]
+\`\`\`python
+def fib(n):
+    a, b = 0, 1
+    while a < n:
+        print(a, end=' ')
+        a, b = b, a+b
 \`\`\`
+
+---
+
+## 3. Mermaid 圖表 (支援防抖)
+在串流輸入時，圖表會等待語法完整後才渲染，不會閃爍報錯。
+
+### 流程圖 (Flowchart)
+\`\`\`mermaid
+graph TD
+    A[使用者輸入] --> B{模式?}
+    B -->|靜態| C[直接渲染]
+    B -->|串流| D[啟動節流]
+    D --> E[更新文字 DOM]
+    E --> F[防抖計時器]
+    F --> G[繪製 Mermaid]
+\`\`\`
+
+### 圓餅圖 (Pie Chart)
+\`\`\`mermaid
+pie title 專案語言分佈
+    "JavaScript" : 45
+    "HTML/CSS" : 25
+    "Markdown" : 20
+    "Other" : 10
+\`\`\`
+
+### 循序圖 (Sequence Diagram)
+\`\`\`mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Component
+    participant S as ShadowDOM
+
+    U->>C: 設定 value = text
+    C->>S: 注入 CSS (一次性)
+    C->>C: 解析 Markdown
+    C->>S: update innerHTML
+    Note over C,S: 樣式完全隔離
+\`\`\`
+
+---
+
+## 4. 標準 Markdown 元素
+- **清單**：
+  1. 有序項目一
+  2. 有序項目二
+     - 子項目 A
+     - 子項目 B
+- **表格**：
+
+| 功能 | 支援 | 說明 |
+| :--- | :---: | :--- |
+| Shadow DOM | ✅ | 樣式隔離 |
+| KaTeX | ✅ | 數學渲染 |
+| Mermaid | ✅ | 流程圖 |
+
+- **連結**：[前往 Google](https://google.com)
+- **刪除線**：~~這是刪除的內容~~
+- **HTML 淨化**：嘗試注入 iframe <iframe src="javascript:alert(1)"></iframe> (應被過濾或安全顯示)
 `;
 
-        let i = 0;
-        function stream() {
-            if (i < text.length) {
-                // 每次加一點字
-                const chunk = text.slice(0, i += 5);
-                output.render(chunk);
-                requestAnimationFrame(stream);
-            } else {
-                output.render(text, true); // 結束
+    // 取得元素
+    const input = document.getElementById('source-input');
+    const preview = document.getElementById('preview');
+    const statusText = document.getElementById('status-text');
+    const renderCountEl = document.getElementById('render-count');
+    
+    let renderCount = 0;
+    let streamInterval = null;
+
+    // 1. 設定 Hooks 監聽渲染狀態
+    preview.config = {
+        throttleInterval: 30,  // 文字更新頻率
+        mermaidDebounce: 800,  // 圖表防抖時間
+        hooks: {
+            // 在 DOM 更新完成後觸發
+            onRendered: (el) => {
+                renderCount++;
+                renderCountEl.textContent = `Render Count: ${renderCount}`;
+                
+                // 自動捲動到底部 (模擬聊天視窗行為)
+                // 這裡要判斷是否正在串流，如果是才捲動
+                if (streamInterval) {
+                    el.scrollTop = el.scrollHeight;
+                }
+            },
+            beforeParse: (md) => {
+                // 可以在這裡做一些前處理，例如將 \n 轉為 <br>
+                return md; 
             }
         }
-        
-        // 開始模擬
-        stream();
+    };
 
-    </script>
+    // 2. 綁定按鈕功能
+    
+    // 功能展示
+    document.getElementById('btn-showcase').addEventListener('click', () => {
+        stopStream();
+        input.value = SHOWCASE_CONTENT;
+        preview.value = SHOWCASE_CONTENT;
+        statusText.textContent = "已載入全功能範例";
+    });
+
+    // 清空
+    document.getElementById('btn-clear').addEventListener('click', () => {
+        stopStream();
+        input.value = '';
+        preview.value = '';
+        statusText.textContent = "已清空";
+    });
+
+    // 模擬 LLM 串流
+    document.getElementById('btn-stream').addEventListener('click', () => {
+        stopStream();
+        statusText.textContent = "🚀 串流模擬中...";
+        preview.value = ''; // 先清空預覽
+        input.value = '';
+        
+        const content = SHOWCASE_CONTENT;
+        let index = 0;
+        
+        // 模擬網路延遲與封包大小不一
+        streamInterval = setInterval(() => {
+            // 每次隨機增加 2 ~ 8 個字元
+            const chunkSize = Math.floor(Math.random() * 6) + 2;
+            const chunk = content.slice(index, index + chunkSize);
+            
+            if (!chunk) {
+                stopStream();
+                statusText.textContent = "✅ 串流完成";
+                return;
+            }
+            
+            const currentText = input.value + chunk;
+            input.value = currentText;
+            
+            // ★★★ 核心：直接設定 value，組件會自動處理節流 ★★★
+            preview.value = currentText;
+            
+            index += chunkSize;
+            
+            // 滾動輸入框
+            input.scrollTop = input.scrollHeight;
+
+        }, 20); // 每 20ms 進一次資料 (速度很快)
+    });
+
+    // 3. 綁定手動輸入
+    input.addEventListener('input', () => {
+        stopStream(); // 如果手動輸入就停止自動串流
+        statusText.textContent = "手動編輯中...";
+        preview.value = input.value;
+    });
+
+    function stopStream() {
+        if (streamInterval) {
+            clearInterval(streamInterval);
+            streamInterval = null;
+        }
+    }
+
+    // 初始載入
+    window.addEventListener('load', () => {
+        input.value = "# Hello Akari!\n試著點擊上方的 **全功能範例** 按鈕。";
+        preview.value = input.value;
+    });
+
+</script>
+
 </body>
 </html>
