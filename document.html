@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - AKARI-Markdown.js</title>
+    <!-- Highlight.js for documentation code blocks -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --sidebar-bg: #161b22;
+            --text-color: #c9d1d9;
+            --accent-color: #f78166;
+            --border-color: #30363d;
+            --code-bg: #1f2428;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        aside h2 {
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            margin-bottom: 20px;
+        }
+
+        aside ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        aside li {
+            margin-bottom: 10px;
+        }
+
+        aside a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+            display: block;
+            padding: 5px 0;
+        }
+
+        aside a:hover {
+            color: var(--accent-color);
+        }
+
+        /* Main Content */
+        main {
+            margin-left: 290px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        h2 { margin-top: 40px; color: #fff; }
+        h3 { margin-top: 30px; }
+
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        pre {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        code {
+            font-family: Consolas, Monaco, monospace;
+        }
+        
+        p code {
+            background: rgba(110, 118, 129, 0.4);
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .note {
+            background: rgba(56, 139, 253, 0.15);
+            border-left: 4px solid #388bfd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <h2>AKARI Markdown</h2>
+        <ul>
+            <li><a href="#introduction">Introduction</a></li>
+            <li><a href="#installation">Installation</a></li>
+            <li><a href="#usage">Basic Usage</a></li>
+            <li><a href="#features">Features Syntax</a></li>
+            <li><a href="#api">API Reference</a></li>
+            <li><a href="#configuration">Configuration</a></li>
+        </ul>
+        <div style="margin-top: 30px; border-top: 1px solid #30363d; padding-top: 20px;">
+            <a href="index.html">← Back to Home</a>
+            <a href="demo.html">→ View Live Demo</a>
+        </div>
+    </aside>
+
+    <main>
+        <a href="index.html" class="back-link">Home</a>
+        <h1 id="introduction">Documentation</h1>
+        <p><strong>AKARI-Markdown.js</strong> is a Web Component wrapper that brings together <code>marked</code>, <code>highlight.js</code>, <code>katex</code>, and <code>mermaid</code> into a single, shadow-DOM encapsulated element. It is designed to handle streaming content (like LLM outputs) robustly.</p>
+
+        <h2 id="installation">Installation</h2>
+        <p>Since the library is built as an ES Module with bundled CDN imports, you can simply import it directly into your project.</p>
+
+        <h3>Using ES Modules</h3>
+        <pre><code class="language-html">&lt;script type="module"&gt;
+  import './akari-markdown.js';
+&lt;/script&gt;</code></pre>
+
+        <h2 id="usage">Basic Usage</h2>
+        <p>Once imported, use the <code>&lt;akari-markdown&gt;</code> tag in your HTML.</p>
+
+        <h3>Declarative (HTML)</h3>
+        <pre><code class="language-html">&lt;akari-markdown&gt;
+# Hello World
+
+This is **markdown** content.
+&lt;/akari-markdown&gt;</code></pre>
+
+        <h3>Imperative (JavaScript)</h3>
+        <pre><code class="language-js">const el = document.createElement('akari-markdown');
+document.body.appendChild(el);
+
+// Update content
+el.value = "# Dynamic Content\n\nUpdates automatically.";</code></pre>
+
+        <div class="note">
+            <strong>Note:</strong> The element uses a throttling mechanism (default 30ms) to prevent performance issues during rapid updates (e.g., streaming).
+        </div>
+
+        <h2 id="features">Features Syntax</h2>
+
+        <h3>1. Code Blocks</h3>
+        <p>Standard Markdown syntax. Language detection is handled by <code>highlight.js</code>.</p>
+        <pre><code>```javascript
+console.log('Hello Akari');
+```</code></pre>
+
+        <h3>2. Math Equations</h3>
+        <p>Powered by KaTeX. Supports both inline and block math.</p>
+        <ul>
+            <li><strong>Inline:</strong> <code>$E = mc^2$</code></li>
+            <li><strong>Block:</strong> <code>$$ \int_0^\infty x^2 dx $$</code></li>
+        </ul>
+
+        <h3>3. Mermaid Diagrams</h3>
+        <p>Use the <code>mermaid</code> language identifier. The component includes a debounce mechanism and integrity check to prevent rendering broken diagrams while typing.</p>
+        <pre><code>```mermaid
+graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
+```</code></pre>
+
+        <h2 id="api">API Reference</h2>
+
+        <h3>Properties</h3>
+        <ul>
+            <li><code>value</code> (getter/setter): Gets or sets the Markdown content string. Triggers a render.</li>
+        </ul>
+
+        <h3>Attributes</h3>
+        <ul>
+            <li><code>no-render</code>: If present on the element during startup, it will not render the initial <code>textContent</code>. Useful if you plan to set data via JS immediately.</li>
+        </ul>
+
+        <h2 id="configuration">Configuration</h2>
+        <p>You can configure the component instance via the <code>config</code> setter.</p>
+
+        <pre><code class="language-js">const element = document.querySelector('akari-markdown');
+
+element.config = {
+    theme: 'dark',          // 'dark' (default) or 'default' (light) for Mermaid
+    throttleInterval: 30,   // Render throttle in ms
+    mermaidDebounce: 300,   // Delay before rendering Mermaid (ms)
+    hooks: {
+        // Pre-process raw markdown
+        beforeParse: (text) => text.replace(/foo/g, 'bar'),
+        
+        // Post-process HTML before DOM insertion
+        afterSanitize: (html) => html,
+        
+        // Called after render is complete
+        onRendered: (shadowRoot) => console.log('Rendered!')
+    }
+};</code></pre>
+
+        <h3>Mermaid Error Handling</h3>
+        <p>AKARI-Markdown.js captures Mermaid syntax errors internally. Instead of crashing, it displays a red error box with the error message and preserves the original source code below it.</p>
+
+    </main>
+
+    <script>hljs.highlightAll();</script>
+</body>
+</html>
