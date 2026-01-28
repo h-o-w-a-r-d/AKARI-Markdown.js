@@ -1,760 +1,207 @@
-<!-- START OF FILE index.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AKARI-Markdown.js Demo</title>
+    <title>AKARI-Markdown.js - The Modern Web Component for Markdown</title>
     <style>
-        /* =========================================
-           1. Global Style Pollution Test
-           Intentionally ugly styles to test Shadow DOM isolation.
-           If Shadow DOM works, the preview on the right should remain unaffected.
-           ========================================= */
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #ddd;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --accent-color: #f78166; /* Akari-like orange/red */
+            --secondary-color: #8b949e;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --btn-primary: #238636;
+            --btn-hover: #2ea043;
         }
 
-        /* Attempts to break H1, H2, p, code styles */
-        h1 { color: #ff00ff; text-decoration: underline; font-size: 50px; text-transform: uppercase; }
-        p { color: yellow; font-size: 24px; letter-spacing: 5px; }
-        code { background: red; color: white; border: 5px solid yellow; }
-        pre { background: pink; }
-        blockquote { border-left: 10px solid red; background: yellow; color: black; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            line-height: 1.6;
+        }
 
-        /* =========================================
-           2. Layout
-           ========================================= */
         header {
-            background: #2d2d2d;
-            padding: 10px 20px;
-            border-bottom: 1px solid #444;
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 60px;
         }
 
-        h1.app-title {
-            /* This header title will be affected by pollution (pink/uppercase), which is expected */
-            margin: 0;
-            font-size: 24px;
-            text-transform: none;
-            color: #fff;
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-color);
             text-decoration: none;
         }
 
-        .main-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
+        nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: 500;
         }
 
-        /* Left Panel: Control & Input */
-        .panel-left {
-            width: 400px;
-            background: #252526;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #444;
+        nav a:hover {
+            color: var(--accent-color);
         }
 
-        .toolbar {
-            padding: 10px;
-            background: #333;
+        .hero {
+            text-align: center;
+            padding: 100px 20px;
+            background: radial-gradient(circle at top, #1f2428 0%, var(--bg-color) 70%);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: -webkit-linear-gradient(45deg, #f78166, #b392f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            color: var(--secondary-color);
+            max-width: 800px;
+            margin: 0 auto 40px;
+        }
+
+        .cta-buttons {
             display: flex;
-            gap: 10px;
+            gap: 20px;
+            justify-content: center;
             flex-wrap: wrap;
         }
 
-        textarea {
-            flex: 1;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            border: none;
-            padding: 15px;
-            resize: none;
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            outline: none;
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid transparent;
         }
 
-        /* Right Panel: Preview */
-        .panel-right {
-            flex: 1;
-            background: #0d1117; /* GitHub Dark Background */
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Ensure flex child scrolling works */
+        .btn-primary {
+            background-color: var(--btn-primary);
+            color: white;
         }
 
-        /* Defining the akari-markdown component dimensions */
-        akari-markdown {
-            flex: 1;
+        .btn-primary:hover {
+            background-color: var(--btn-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--secondary-color);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            padding: 60px 10%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .feature-card h3 {
+            color: var(--accent-color);
+            margin-top: 0;
+        }
+
+        footer {
+            text-align: center;
             padding: 40px;
-            overflow-y: auto; /* Scrollbar is here */
-            /* Smooth scrolling */
-            scroll-behavior: smooth;
+            border-top: 1px solid var(--border-color);
+            color: var(--secondary-color);
+            font-size: 0.9rem;
         }
 
-        /* Button Styles (Resetting pollution) */
-        button {
-            padding: 8px 16px;
-            background: #0e639c;
-            color: white;
-            border: none;
-            cursor: pointer;
+        code {
+            background: rgba(110, 118, 129, 0.4);
+            padding: 2px 6px;
             border-radius: 4px;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-        button:hover { background: #1177bb; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        button.secondary { background: #444; }
-
-        /* Status Bar */
-        .status-bar {
-            padding: 5px 10px;
-            background: #007acc;
-            color: white;
-            font-size: 12px;
             font-family: monospace;
-            display: flex;
-            justify-content: space-between;
-            flex-shrink: 0;
         }
-        
-        /* Fix left panel text pollution for UI readability */
-        .panel-left p {
-            font-size: 14px;
-            color: #aaa;
-            letter-spacing: normal;
-            margin: 5px 10px;
-        }
+
+        /* Github Icon SVG */
+        .icon-github { width: 20px; height: 20px; fill: currentColor; vertical-align: middle; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-<header>
-    <!-- This title will be pink due to pollution, proving external styles are active -->
-    <h1 class="app-title">AKARI-Markdown.js Demo</h1>
-    <div style="font-size: 12px; color: #aaa;">
-        Left: Input / Stream Sim &nbsp;|&nbsp; Right: Web Component (Shadow DOM)
-    </div>
-</header>
+    <header>
+        <a href="#" class="logo">AKARI-Markdown.js</a>
+        <nav>
+            <a href="https://github.com/h-o-w-a-r-d/AKARI-Markdown.js" target="_blank">GitHub</a>
+            <a href="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/document.html">Docs</a>
+        </nav>
+    </header>
 
-<div class="main-container">
-    <!-- Left: Controls & Input -->
-    <div class="panel-left">
-        <div class="toolbar">
-            <button id="btn-showcase">📝 Load Showcase</button>
-            <button id="btn-stream">🚀 Simulate Stream</button>
-            <button id="btn-clear" class="secondary">🗑️ Clear</button>
+    <section class="hero">
+        <h1>AKARI-Markdown.js</h1>
+        <p class="tagline">A robust, Shadow DOM encapsulated Markdown renderer Web Component with built-in Mermaid, Math (KaTeX), and syntax highlighting support.</p>
+        
+        <div class="cta-buttons">
+            <a href="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/demo.html" class="btn btn-primary">Live Demo</a>
+            <a href="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/document.html" class="btn btn-secondary">Documentation</a>
+            <a href="https://github.com/h-o-w-a-r-d/AKARI-Markdown.js" class="btn btn-secondary">
+                <svg class="icon-github" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                View on GitHub
+            </a>
         </div>
-        <p>Edit manually below or use buttons to test:</p>
-        <textarea id="source-input" placeholder="Type Markdown here..."></textarea>
-    </div>
+    </section>
 
-    <!-- Right: Preview Component -->
-    <div class="panel-right">
-        <!-- 
-            ★★★ Web Component ★★★ 
-            Note: No classes here, style isolation is handled internally.
-        -->
-        <akari-markdown id="preview"></akari-markdown>
-        
-        <div class="status-bar">
-            <span id="status-text">Ready</span>
-            <span id="render-count">Render Count: 0</span>
+    <section class="features">
+        <div class="feature-card">
+            <h3>Shadow DOM Isolation</h3>
+            <p>Styles are completely encapsulated. Your Markdown content won't bleed styles into your app, and your app CSS won't break the rendered content.</p>
         </div>
-    </div>
-</div>
-
-<!-- Import Module -->
-<script type="module" src="https://h-o-w-a-r-d.github.io/AKARI-Markdown.js/v1.1.0/akari-markdown.js"></script>
-
-<script type="module">
-    // Prepare a complex Markdown string containing all features
-    const SHOWCASE_CONTENT = `
-# Akari Markdown Feature Showcase
-
-Welcome to **Akari Markdown**. This is a Web Component based on Shadow DOM, ensuring style isolation and supporting streaming output.
-
-> **Note**: The \`H1\` outside the page is pink, and the \`P\` is yellow, but within this block, the style remains a clean GitHub-style.
-
----
-
-## 📝 Markdown Syntax Tutorial
-
-### 1. Headings and Text
-# Level 1 Heading (H1)
-## Level 2 Heading (H2)
-**This is bold text**
-*This is italic text*
-~~This is strikethrough~~
-
-### 2. Lists
-- Unordered list item A
-- Unordered list item B
-1. Ordered list item 1
-2. Ordered list item 2
-
-### 3. Code Blocks
-Use triple backticks (\`) to wrap code:
-
-\`\`\`javascript
-function hello() {
-    console.log("Hello World");
-}
-\`\`\`
-
-### 4. Quotes and Links
-> This is a blockquote
-[Google Home](https://www.google.com)
-
----
-
-## 📐 LaTeX Mathematics Tutorial
-This editor uses **KaTeX** for rendering, supporting both inline and block formulas.
-
-### 1. Inline Formula
-Wrap with a single \`$\`, for example:
-Mass-energy equivalence: $E = mc^2$
-Euler's identity: $e^{i\pi} + 1 = 0$
-
-### 2. Independent Block (Block)
-Wrap with \` $$ \`, and the formula will be displayed centered:
-$$
-x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
-$$
-
-
-### 3. Common Math Symbols Quick Reference
-| Description | Syntax | Preview |
-| :--- | :--- | :--- |
-| Fraction | \`\\frac{a}{b}\` | $\\frac{a}{b}$ |
-| Superscript | \`x^2\` | $x^2$ |
-| Subscript | \`x_i\` | $x_i$ |
-| Square Root | \`\\sqrt{x}\` | $\\sqrt{x}$ |
-| Summation | \`\\sum_{i=1}^n\` | $\\sum_{i=1}^n$ |
-| Integral  | \`\\int_a^b f(x) dx\` | $\\int_a^b f(x) dx$ |
-| Greek Letters | \`\\alpha, \\beta, \\theta\` | $\\alpha, \\beta, \\theta$ |
-| Matrix | \`\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\` | $\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$ |
-
-
-## 📊 Mermaid Diagram Examples
-
-
-#### Flowchart
-\`\`\`mermaid
-flowchart TD
-    A[Christmas] -->|Get money| B(Go shopping)
-    B --> C{Let me think}
-    C -->|One| D[Laptop]
-    C -->|Two| E[iPhone]
-    C -->|Three| F[fa:fa-car Car]
-\`\`\`
-
-
-#### Class
-\`\`\`mermaid
-classDiagram
-    Animal <|-- Duck
-    Animal <|-- Fish
-    Animal <|-- Zebra
-    Animal : +int age
-    Animal : +String gender
-    Animal: +isMammal()
-    Animal: +mate()
-    class Duck{
-      +String beakColor
-      +swim()
-      +quack()
-    }
-    class Fish{
-      -int sizeInFeet
-      -canEat()
-    }
-    class Zebra{
-      +bool is_wild
-      +run()
-    }
-\`\`\`
-
-
-#### Sequence
-\`\`\`mermaid
-sequenceDiagram
-    Alice->>+John: Hello John, how are you?
-    Alice->>+John: John, can you hear me?
-    John-->>-Alice: Hi Alice, I can hear you!
-    John-->>-Alice: I feel great!
-\`\`\`
-
-
-#### Entity Relationship
-\`\`\`mermaid
-erDiagram
-    CUSTOMER ||--o{ ORDER : places
-    ORDER ||--|{ ORDER_ITEM : contains
-    PRODUCT ||--o{ ORDER_ITEM : includes
-    CUSTOMER {
-        string id
-        string name
-        string email
-    }
-    ORDER {
-        string id
-        date orderDate
-        string status
-    }
-    PRODUCT {
-        string id
-        string name
-        float price
-    }
-    ORDER_ITEM {
-        int quantity
-        float price
-    }
-\`\`\`
-
-
-#### State
-\`\`\`mermaid
-stateDiagram-v2
-    [*] --> Still
-    Still --> [*]
-    Still --> Moving
-    Moving --> Still
-    Moving --> Crash
-    Crash --> [*]
-\`\`\`
-
-
-#### Mindmap
-\`\`\`mermaid
-mindmap
-  root((mindmap))
-    Origins
-      Long history
-      ::icon(fa fa-book)
-      Popularisation
-        British popular psychology author Tony Buzan
-    Research
-      On effectiveness<br/>and features
-      On Automatic creation
-        Uses
-            Creative techniques
-            Strategic planning
-            Argument mapping
-    Tools
-      Pen and paper
-      Mermaid
-\`\`\`
-
-
-#### Block
-\`\`\`mermaid
-block-beta
-columns 1
-  db(("DB"))
-  blockArrowId6<["&nbsp;&nbsp;&nbsp;"]>(down)
-  block:ID
-    A
-    B["A wide one in the middle"]
-    C
-  end
-  space
-  D
-  ID --> D
-  C --> D
-  style B fill:#969,stroke:#333,stroke-width:4px
-\`\`\`
-
-
-#### C4
-\`\`\`mermaid
-C4Context
-    title System Context diagram for Internet Banking System
-    Enterprise_Boundary(b0, "BankBoundary0") {
-        Person(customerA, "Banking Customer A", "A customer of the bank, with personal bank accounts.")
-        Person(customerB, "Banking Customer B")
-        Person_Ext(customerC, "Banking Customer C", "desc")
-
-        Person(customerD, "Banking Customer D", "A customer of the bank, <br/> with personal bank accounts.")
-
-        System(SystemAA, "Internet Banking System", "Allows customers to view information about their bank accounts, and make payments.")
-
-        Enterprise_Boundary(b1, "BankBoundary") {
-            SystemDb_Ext(SystemE, "Mainframe Banking System", "Stores all of the core banking information about customers, accounts, transactions, etc.")
-
-            System_Boundary(b2, "BankBoundary2") {
-                System(SystemA, "Banking System A")
-                System(SystemB, "Banking System B", "A system of the bank, with personal bank accounts. next line.")
-            }
-
-            System_Ext(SystemC, "E-mail system", "The internal Microsoft Exchange e-mail system.")
-            SystemDb(SystemD, "Banking System D Database", "A system of the bank, with personal bank accounts.")
-
-            Boundary(b3, "BankBoundary3", "boundary") {
-                SystemQueue(SystemF, "Banking System F Queue", "A system of the bank.")
-                SystemQueue_Ext(SystemG, "Banking System G Queue", "A system of the bank, with personal bank accounts.")
-            }
-        }
-    }
-
-    BiRel(customerA, SystemAA, "Uses")
-    BiRel(SystemAA, SystemE, "Uses")
-    Rel(SystemAA, SystemC, "Sends e-mails", "SMTP")
-    Rel(SystemC, customerA, "Sends e-mails to")
-\`\`\`
-
-
-#### Gantt
-\`\`\`mermaid
-gantt
-    title A Gantt Diagram
-    dateFormat  YYYY-MM-DD
-    section Section
-    A task           :a1, 2014-01-01, 30d
-    Another task     :after a1  , 20d
-    section Another
-    Task in sec      :2014-01-12  , 12d
-    another task      : 24d
-\`\`\`
-
-
-#### Git
-\`\`\`mermaid
-gitGraph
-    commit
-    branch develop
-    checkout develop
-    commit
-    commit
-    checkout main
-    merge develop
-    commit
-    branch feature
-    checkout feature
-    commit
-    commit
-    checkout main
-    merge feature
-\`\`\`
-
-
-#### Pie
-\`\`\`mermaid
-pie title Pets adopted by volunteers
-    "Dogs" : 386
-    "Cats" : 85
-    "Rats" : 15
-\`\`\`
-
-
-#### Quadrant
-\`\`\`mermaid
-quadrantChart
-    title Reach and engagement of campaigns
-    x-axis Low Reach --> High Reach
-    y-axis Low Engagement --> High Engagement
-    quadrant-1 We should expand
-    quadrant-2 Need to promote
-    quadrant-3 Re-evaluate
-    quadrant-4 May be improved
-    Campaign A: [0.3, 0.6]
-    Campaign B: [0.45, 0.23]
-    Campaign C: [0.57, 0.69]
-    Campaign D: [0.78, 0.34]
-    Campaign E: [0.40, 0.34]
-    Campaign F: [0.35, 0.78]
-\`\`\`
-
-
-#### Requirement
-\`\`\`mermaid
-requirementDiagram
-
-    requirement test_req {
-    id: 1
-    text: the test text.
-    risk: high
-    verifymethod: test
-    }
-
-    element test_entity {
-    type: simulation
-    }
-
-    test_entity - satisfies -> test_req
-\`\`\`
-
-
-#### Sankey
-\`\`\`mermaid
----
-config:
-  sankey:
-    showValues: false
----
-sankey-beta
-
-Agricultural 'waste',Bio-conversion,124.729
-Bio-conversion,Liquid,0.597
-Bio-conversion,Losses,26.862
-Bio-conversion,Solid,280.322
-Bio-conversion,Gas,81.144
-Biofuel imports,Liquid,35
-Biomass imports,Solid,35
-Coal imports,Coal,11.606
-Coal reserves,Coal,63.965
-Coal,Solid,75.571
-District heating,Industry,10.639
-District heating,Heating and cooling - commercial,22.505
-District heating,Heating and cooling - homes,46.184
-Electricity grid,Over generation / exports,104.453
-Electricity grid,Heating and cooling - homes,113.726
-Electricity grid,H2 conversion,27.14
-Electricity grid,Industry,342.165
-Electricity grid,Road transport,37.797
-Electricity grid,Agriculture,4.412
-Electricity grid,Heating and cooling - commercial,40.858
-Electricity grid,Losses,56.691
-Electricity grid,Rail transport,7.863
-Electricity grid,Lighting & appliances - commercial,90.008
-Electricity grid,Lighting & appliances - homes,93.494
-Gas imports,NGas,40.719
-Gas reserves,NGas,82.233
-Gas,Heating and cooling - commercial,0.129
-Gas,Losses,1.401
-Gas,Thermal generation,151.891
-Gas,Agriculture,2.096
-Gas,Industry,48.58
-Geothermal,Electricity grid,7.013
-H2 conversion,H2,20.897
-H2 conversion,Losses,6.242
-H2,Road transport,20.897
-Hydro,Electricity grid,6.995
-Liquid,Industry,121.066
-Liquid,International shipping,128.69
-Liquid,Road transport,135.835
-Liquid,Domestic aviation,14.458
-Liquid,International aviation,206.267
-Liquid,Agriculture,3.64
-Liquid,National navigation,33.218
-Liquid,Rail transport,4.413
-Marine algae,Bio-conversion,4.375
-NGas,Gas,122.952
-Nuclear,Thermal generation,839.978
-Oil imports,Oil,504.287
-Oil reserves,Oil,107.703
-Oil,Liquid,611.99
-Other waste,Solid,56.587
-Other waste,Bio-conversion,77.81
-Pumped heat,Heating and cooling - homes,193.026
-Pumped heat,Heating and cooling - commercial,70.672
-Solar PV,Electricity grid,59.901
-Solar Thermal,Heating and cooling - homes,19.263
-Solar,Solar Thermal,19.263
-Solar,Solar PV,59.901
-Solid,Agriculture,0.882
-Solid,Thermal generation,400.12
-Solid,Industry,46.477
-Thermal generation,Electricity grid,525.531
-Thermal generation,Losses,787.129
-Thermal generation,District heating,79.329
-Tidal,Electricity grid,9.452
-UK land based bioenergy,Bio-conversion,182.01
-Wave,Electricity grid,19.013
-Wind,Electricity grid,289.366
-\`\`\`
-
-
-#### Timeline
-\`\`\`mermaid
-timeline
-    title History of Social Media Platform
-    2002 : LinkedIn
-    2004 : Facebook
-         : Google
-    2005 : YouTube
-    2006 : Twitter
-\`\`\`
-
-
-#### User Journey
-\`\`\`mermaid
-journey
-    title My working day
-    section Go to work
-      Make tea: 5: Me
-      Go upstairs: 3: Me
-      Do work: 1: Me, Cat
-    section Go home
-      Go downstairs: 5: Me
-      Sit down: 5: Me
-\`\`\`
-
-
-#### XY
-\`\`\`mermaid
-xychart-beta
-    title "Sales Revenue"
-    x-axis [jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec]
-    y-axis "Revenue (in $)" 4000 --> 11000
-    bar [5000, 6000, 7500, 8200, 9500, 10500, 11000, 10200, 9200, 8500, 7000, 6000]
-    line [5000, 6000, 7500, 8200, 9500, 10500, 11000, 10200, 9200, 8500, 7000, 6000]
-\`\`\`
-
-這也是對應部分的翻譯：
-
-| Feature | Support | Description |
-| :--- | :---: | :--- |
-| Shadow DOM | ✅ | Style Isolation |
-| KaTeX | ✅ | Math Rendering |
-| Mermaid | ✅ | Diagrams |
-
-
-- **HTML Sanitization**: Attempt to inject an iframe \`<iframe src="javascript:alert(1)"></iframe>\` (should be displayed safely)
-<iframe src="javascript:alert(1)"></iframe>
-`;
-
-    // Elements
-    const input = document.getElementById('source-input');
-    const preview = document.getElementById('preview');
-    const statusText = document.getElementById('status-text');
-    const renderCountEl = document.getElementById('render-count');
-    
-    let renderCount = 0;
-    let streamInterval = null;
-
-    // 1. Configure Hooks
-    preview.config = {
-        throttleInterval: 10,  // Text update frequency
-        mermaidDebounce: 800,  // Diagram debounce
-        hooks: {
-            // Triggered after DOM update
-            onRendered: (el) => {
-                renderCount++;
-                renderCountEl.textContent = `Render Count: ${renderCount}`;
-                
-                // Auto-scroll to bottom (Chat interface behavior)
-                // Only scroll if we are actively streaming
-                if (streamInterval) {
-                    // ★★★ SCROLL FIX ★★★
-                    // Explicitly scroll the preview element itself (the host of Shadow DOM)
-                    // This ensures only the right panel scrolls, not the window or left panel
-                    preview.scrollTop = preview.scrollHeight;
-                }
-            },
-            beforeParse: (md) => {
-                // Pre-processing hook
-                return md; 
-            }
-        }
-    };
-
-    // 2. Event Listeners
-    
-// Load Showcase
-const btnShowcase = document.getElementById('btn-showcase');
-if(btnShowcase) {
-    btnShowcase.addEventListener('click', () => {
-        stopStream();
-        // 確保 SHOWCASE_CONTENT 變數在外部有定義，否則請填入字串
-        const content = typeof SHOWCASE_CONTENT !== 'undefined' ? SHOWCASE_CONTENT : "# Demo Content"; 
-        input.value = content;
-        preview.value = content;
-        statusText.textContent = "Showcase content loaded";
-    });
-}
-
-// Clear
-const btnClear = document.getElementById('btn-clear');
-if(btnClear) {
-    btnClear.addEventListener('click', () => {
-        stopStream();
-        input.value = '';
-        preview.value = '';
-        statusText.textContent = "Cleared";
-    });
-}
-
-// 2. Simulate Stream (加速版)
-const btnStream = document.getElementById('btn-stream');
-if(btnStream) {
-    btnStream.addEventListener('click', () => {
-        stopStream();
-        statusText.textContent = "🚀 Super Fast Streaming...";
-        preview.value = ''; 
-        input.value = '';
-        
-        const content = typeof SHOWCASE_CONTENT !== 'undefined' ? SHOWCASE_CONTENT : "# Default Demo Content...";
-        let index = 0;
-        
-        // 使用更短的間隔
-        streamInterval = setInterval(() => {
-            // ★★★ 加速關鍵：大幅增加 Chunk Size ★★★
-            // 每次隨機輸出 5 到 30 個字元
-            const chunkSize = Math.floor(Math.random() * 25) + 5;
-            const chunk = content.slice(index, index + chunkSize);
-            
-            if (!chunk) {
-                stopStream();
-                statusText.textContent = "✅ Stream completed";
-                return;
-            }
-            
-            const currentText = input.value + chunk;
-            input.value = currentText;
-            preview.value = currentText;
-            
-            index += chunkSize;
-            
-            // 注意：這裡移除了原本的 input.scrollTop = input.scrollHeight;
-            // 現在改由 preview.config.hooks.onRendered 負責觸發
-            
-        }, 10); // 10ms 是瀏覽器穩定運行的較快頻率
-    });
-}
-
-// 3. Manual Input
-input.addEventListener('input', () => {
-    stopStream();
-    statusText.textContent = "Manual editing...";
-    preview.value = input.value;
-});
-
-function stopStream() {
-    if (streamInterval) {
-        clearInterval(streamInterval);
-        streamInterval = null;
-    }
-}
-
-// Initial Load
-window.addEventListener('load', () => {
-    // 簡單初始化
-    if(input.value.trim() === '') {
-        input.value = "# Hello Akari!\nTry clicking the **Stream** button.";
-        preview.value = input.value;
-    }
-});
-
-</script>
+        <div class="feature-card">
+            <h3>Mermaid & Charts</h3>
+            <p>Built-in support for <code>mermaid</code> diagrams. Includes fixes for rendering integrity, streaming detection, and automatic error handling.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Math Support</h3>
+            <p>Renders math equations elegantly using <strong>KaTeX</strong>. Supports both inline <code>$E=mc^2$</code> and block <code>$$...$$</code> syntax.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Syntax Highlighting</h3>
+            <p>Integrated <strong>highlight.js</strong> for beautiful code blocks with automatic language detection and dark mode support.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Streaming Ready</h3>
+            <p>Designed for LLM outputs. It detects incomplete code blocks and shows a "typing" cursor animation for unclosed tags.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Easy to Use</h3>
+            <p>Just import the JS file and use the <code>&lt;akari-markdown&gt;</code> tag. No complex build step required.</p>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 h-o-w-a-r-d. Released under the MIT License.</p>
+        <p>AKARI-Markdown.js v1.1.0</p>
+    </footer>
 
 </body>
 </html>
